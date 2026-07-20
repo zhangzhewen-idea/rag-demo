@@ -7,9 +7,14 @@ import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.DocumentGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
+import com.zhangzhewen.ragdemo.domain.knowledge.DocumentStatus;
+import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeDocument;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.springframework.http.HttpStatus;
@@ -26,17 +31,19 @@ public class ConversationService {
   private final VectorGateway vectors;
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
+  private final DocumentGateway documents;
   private final RetrievalPolicy policy;
 
   /**
    * 注入用例依赖。
    */
   public ConversationService(ConversationGateway conversations, VectorGateway vectors, AiGateway ai,
-      KnowledgeGateway knowledge, RetrievalPolicy policy) {
+      KnowledgeGateway knowledge, DocumentGateway documents, RetrievalPolicy policy) {
     this.conversations = conversations;
     this.vectors = vectors;
     this.ai = ai;
     this.knowledge = knowledge;
+    this.documents = documents;
     this.policy = policy;
   }
 
@@ -87,10 +94,11 @@ public class ConversationService {
       Consumer<String> delta) {
     Conversation c = requireOwned(conversationId, userId);
     requireSearchable(c.knowledgeBaseId());
+    List<Message> history = conversations.recentMessages(conversationId, 20);
     conversations.saveMessage(conversationId, "USER", question, "COMPLETED", null, null, null);
     long start = System.nanoTime();
-    List<RetrievedChunk> refs = vectors.search(c.knowledgeBaseId(), question, policy.topK(),
-        policy.similarityThreshold());
+    boolean overview = isOverviewQuestion(question);
+    List<RetrievedChunk> refs = retrieve(c.knowledgeBaseId(), question, history, overview);
     if (refs.isEmpty()) {
       delta.accept(NO_EVIDENCE);
       Long id = conversations.saveMessage(conversationId, "ASSISTANT", NO_EVIDENCE, "COMPLETED",
@@ -100,7 +108,7 @@ public class ConversationService {
     }
     StringBuilder answer = new StringBuilder();
     return CompletableFuture.supplyAsync(() -> {
-      ai.streamAnswer(question, conversations.recentMessages(conversationId, 20), refs, p -> {
+      ai.streamAnswer(question, history, refs, p -> {
         answer.append(p);
         delta.accept(p);
       });
@@ -110,6 +118,55 @@ public class ConversationService {
       conversations.saveReferences(id, refs);
       return new ChatResult(id, answer.toString(), refs, elapsed);
     });
+  }
+
+  private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
+      List<Message> history, boolean overview) {
+    if (!overview) {
+      return vectors.search(knowledgeBaseId, contextualQuery(question, history), policy.topK(),
+          policy.similarityThreshold());
+    }
+    int perDocumentTopK = Math.max(2, Math.min(4, policy.topK() / 2));
+    List<RetrievedChunk> result = new ArrayList<>();
+    for (KnowledgeDocument document : documents.listByKnowledgeBase(knowledgeBaseId)) {
+      if (document.status() != DocumentStatus.READY) {
+        continue;
+      }
+      String query = document.originalName() + " 主要内容 核心要点 完整概览";
+      result.addAll(vectors.searchDocument(knowledgeBaseId, document.id(), query, perDocumentTopK,
+          policy.similarityThreshold()));
+    }
+    return result;
+  }
+
+  private String contextualQuery(String question, List<Message> history) {
+    String normalized = normalize(question);
+    boolean refersToHistory = List.of("这", "那", "上述", "前面", "刚才", "其他", "除了", "它")
+        .stream().anyMatch(normalized::contains);
+    if (!refersToHistory) {
+      return question;
+    }
+    for (int i = history.size() - 1; i >= 0; i--) {
+      Message message = history.get(i);
+      if ("ASSISTANT".equals(message.role()) && !message.content().isBlank()) {
+        String context = message.content().length() > 600
+            ? message.content().substring(0, 600) : message.content();
+        return context + "\n追问：" + question;
+      }
+    }
+    return question;
+  }
+
+  private boolean isOverviewQuestion(String question) {
+    String normalized = normalize(question);
+    return normalized.equals("你知道什么") || normalized.equals("知识库有什么")
+        || normalized.contains("有哪些内容") || normalized.contains("全部内容")
+        || normalized.contains("所有内容") || normalized.contains("完整概览")
+        || normalized.contains("全面介绍") || normalized.contains("概括知识库");
+  }
+
+  private String normalize(String value) {
+    return value.toLowerCase(Locale.ROOT).replaceAll("[\\s，。！？、,.!?：:；;]", "");
   }
 
   private long elapsed(long start) {

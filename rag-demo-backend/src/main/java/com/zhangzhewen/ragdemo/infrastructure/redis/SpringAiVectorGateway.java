@@ -43,9 +43,23 @@ public class SpringAiVectorGateway implements VectorGateway {
   @Override
   public List<RetrievedChunk> search(Long knowledgeBaseId, String query, int topK,
       double threshold) {
+    return search(query, topK, threshold, "knowledgeBaseId == '" + knowledgeBaseId + "'");
+  }
+
+  /**
+   * 概览问题按文档过滤，避免大文档的切片挤占其他文档。
+   */
+  @Override
+  public List<RetrievedChunk> searchDocument(Long knowledgeBaseId, Long documentId, String query,
+      int topK, double threshold) {
+    String filter = "knowledgeBaseId == '" + knowledgeBaseId + "' && documentId == '"
+        + documentId + "'";
+    return search(query, topK, threshold, filter);
+  }
+
+  private List<RetrievedChunk> search(String query, int topK, double threshold, String filter) {
     SearchRequest request = SearchRequest.builder().query(query).topK(topK)
-        .similarityThreshold(threshold)
-        .filterExpression("knowledgeBaseId == '" + knowledgeBaseId + "'").build();
+        .similarityThreshold(threshold).filterExpression(filter).build();
     return store.similaritySearch(request).stream().map(this::map).toList();
   }
 
