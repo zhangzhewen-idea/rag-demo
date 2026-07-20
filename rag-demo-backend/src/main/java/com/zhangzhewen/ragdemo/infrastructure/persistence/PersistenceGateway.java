@@ -31,14 +31,16 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
         return listUsers("WHERE u.username=? AND u.deleted=0", username).stream().findFirst();
     }
     @Override public Optional<User> findUserById(Long id) { return listUsers("WHERE u.id=? AND u.deleted=0", id).stream().findFirst(); }
-    @Override public List<User> list() { return listUsers("WHERE u.deleted=0 ORDER BY u.id"); }
+    @Override public List<User> list() { return listUsers("WHERE u.deleted=0").stream().sorted(Comparator.comparing(User::id)).toList(); }
     private List<User> listUsers(String where, Object... args) {
-        String sql = "SELECT u.id,u.username,u.password,u.nickname,u.avatar_url,u.status," +
-                "COALESCE(GROUP_CONCAT(r.role_code),'') roles FROM sys_user u LEFT JOIN sys_user_role ur ON ur.user_id=u.id " +
-                "LEFT JOIN sys_role r ON r.id=ur.role_id " + where + " GROUP BY u.id,u.username,u.password,u.nickname,u.avatar_url,u.status";
-        return jdbc.query(sql, (rs, n) -> new User(rs.getLong("id"), rs.getString("username"), rs.getString("password"),
+        return jdbc.query(userQuery(where), (rs, n) -> new User(rs.getLong("id"), rs.getString("username"), rs.getString("password"),
                 rs.getString("nickname"), rs.getString("avatar_url"), UserStatus.valueOf(rs.getString("status")),
                 parseRoles(rs.getString("roles"))), args);
+    }
+    static String userQuery(String where) {
+        return "SELECT u.id,u.username,u.password,u.nickname,u.avatar_url,u.status," +
+                "COALESCE(GROUP_CONCAT(r.role_code),'') roles FROM sys_user u LEFT JOIN sys_user_role ur ON ur.user_id=u.id " +
+                "LEFT JOIN sys_role r ON r.id=ur.role_id " + where + " GROUP BY u.id,u.username,u.password,u.nickname,u.avatar_url,u.status";
     }
     private Set<Role> parseRoles(String raw) {
         if (raw == null || raw.isBlank()) return Set.of();

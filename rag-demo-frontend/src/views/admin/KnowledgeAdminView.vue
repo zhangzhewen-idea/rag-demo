@@ -1,2 +1,99 @@
-<script setup lang="ts">import { onMounted,reactive,ref } from 'vue';import { adminApi } from '@/api';import { ElMessage } from 'element-plus';import type { KnowledgeBase } from '@/types';const list=ref<KnowledgeBase[]>([]),dialog=ref(false),editing=ref<number>(),form=reactive({name:'',description:'',coverUrl:'',status:'ENABLED'});onMounted(load);async function load(){list.value=await adminApi.knowledge()}function open(item?:KnowledgeBase){editing.value=item?.id;Object.assign(form,item??{name:'',description:'',coverUrl:'',status:'ENABLED'});dialog.value=true}async function save(){if(editing.value)await adminApi.updateKnowledge(editing.value,form);else await adminApi.createKnowledge(form);dialog.value=false;ElMessage.success('保存成功');load()}async function toggle(item:KnowledgeBase){await adminApi.updateKnowledge(item.id,{...item,status:item.status==='ENABLED'?'DISABLED':'ENABLED'});load()}</script>
-<template><div class="page"><header class="page-head"><div><span class="eyebrow">KNOWLEDGE ADMIN</span><h1>知识库管理</h1><p>维护知识范围、启停状态和文档入口。</p></div><el-button type="primary" @click="open()">新增知识库</el-button></header><el-table :data="list" class="glass-table"><el-table-column prop="name" label="名称" min-width="200"/><el-table-column prop="description" label="描述" min-width="280" show-overflow-tooltip/><el-table-column label="状态" width="120"><template #default="{row}"><el-tag :type="row.status==='ENABLED'?'success':'info'">{{row.status==='ENABLED'?'已启用':'已停用'}}</el-tag></template></el-table-column><el-table-column label="操作" width="260"><template #default="{row}"><el-button text type="primary" @click="open(row)">编辑</el-button><el-button text @click="toggle(row)">{{row.status==='ENABLED'?'停用':'启用'}}</el-button><el-button text @click="$router.push({path:'/admin/documents',query:{kb:row.id}})">文档管理</el-button></template></el-table-column></el-table><el-dialog v-model="dialog" :title="editing?'编辑知识库':'新增知识库'" width="520"><el-form :model="form" label-position="top"><el-form-item label="名称"><el-input v-model="form.name"/></el-form-item><el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="4"/></el-form-item><el-form-item label="封面 URL"><el-input v-model="form.coverUrl"/></el-form-item></el-form><template #footer><el-button @click="dialog=false">取消</el-button><el-button type="primary" @click="save">保存</el-button></template></el-dialog></div></template>
+<script setup lang="ts">
+import { nextTick, onMounted, reactive, ref } from 'vue'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { adminApi } from '@/api'
+import type { KnowledgeBase } from '@/types'
+
+interface KnowledgeForm {
+  name: string
+  description: string
+  coverUrl: string
+  status: string
+}
+
+const list = ref<KnowledgeBase[]>([])
+const dialog = ref(false)
+const editing = ref<number>()
+const saving = ref(false)
+const formRef = ref<FormInstance>()
+const form = reactive<KnowledgeForm>({ name: '', description: '', coverUrl: '', status: 'ENABLED' })
+const rules: FormRules<KnowledgeForm> = {
+  name: [
+    { required: true, whitespace: true, message: '请输入知识库名称', trigger: 'blur' },
+    { max: 128, message: '知识库名称不能超过 128 个字符', trigger: 'blur' },
+  ],
+  description: [{ max: 1000, message: '描述不能超过 1000 个字符', trigger: 'blur' }],
+  coverUrl: [{ type: 'url', message: '请输入正确的封面 URL', trigger: 'blur' }],
+}
+
+onMounted(load)
+
+async function load() {
+  try {
+    list.value = await adminApi.knowledge()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  }
+}
+
+function open(item?: KnowledgeBase) {
+  editing.value = item?.id
+  Object.assign(form, item ?? { name: '', description: '', coverUrl: '', status: 'ENABLED' })
+  dialog.value = true
+  nextTick(() => formRef.value?.clearValidate())
+}
+
+async function save() {
+  if (saving.value) return
+  if (!form.name.trim()) {
+    await formRef.value?.validateField('name').catch(() => false)
+    ElMessage.warning('请填写知识库名称')
+    return
+  }
+  if (!await formRef.value?.validate().catch(() => false)) return
+  saving.value = true
+  try {
+    if (editing.value) await adminApi.updateKnowledge(editing.value, form)
+    else await adminApi.createKnowledge(form)
+    dialog.value = false
+    ElMessage.success('保存成功')
+    await load()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function toggle(item: KnowledgeBase) {
+  try {
+    await adminApi.updateKnowledge(item.id, { ...item, status: item.status === 'ENABLED' ? 'DISABLED' : 'ENABLED' })
+    await load()
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  }
+}
+</script>
+
+<template>
+  <div class="page">
+    <header class="page-head">
+      <div><span class="eyebrow">KNOWLEDGE ADMIN</span><h1>知识库管理</h1><p>维护知识范围、启停状态和文档入口。</p></div>
+      <el-button type="primary" @click="open()">新增知识库</el-button>
+    </header>
+    <el-table :data="list" class="glass-table">
+      <el-table-column prop="name" label="名称" min-width="200" />
+      <el-table-column prop="description" label="描述" min-width="280" show-overflow-tooltip />
+      <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ row.status === 'ENABLED' ? '已启用' : '已停用' }}</el-tag></template></el-table-column>
+      <el-table-column label="操作" width="260"><template #default="{ row }"><el-button text type="primary" @click="open(row)">编辑</el-button><el-button text @click="toggle(row)">{{ row.status === 'ENABLED' ? '停用' : '启用' }}</el-button><el-button text @click="$router.push({ path: '/admin/documents', query: { kb: row.id } })">文档管理</el-button></template></el-table-column>
+    </el-table>
+    <el-dialog v-model="dialog" :title="editing ? '编辑知识库' : '新增知识库'" width="520">
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="save">
+        <el-form-item label="名称" prop="name"><el-input v-model="form.name" maxlength="128" show-word-limit /></el-form-item>
+        <el-form-item label="描述" prop="description"><el-input v-model="form.description" type="textarea" :rows="4" maxlength="1000" show-word-limit /></el-form-item>
+        <el-form-item label="封面 URL" prop="coverUrl"><el-input v-model="form.coverUrl" /></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="dialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template>
+    </el-dialog>
+  </div>
+</template>
