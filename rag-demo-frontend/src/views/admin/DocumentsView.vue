@@ -10,7 +10,7 @@ const ACTIVE_STATUSES = new Set(['PENDING', 'PROCESSING', 'DELETING'])
 const STATUS_TEXT: Record<string, string> = {
   PENDING: '等待处理',
   PROCESSING: '处理中',
-  READY: '已就绪',
+  READY: '已入库',
   FAILED: '失败',
   DELETING: '删除中',
 }
@@ -114,7 +114,7 @@ function tag(status: string) {
       <div>
         <span class="eyebrow">DOCUMENT INGESTION</span>
         <h1>文档管理</h1>
-        <p>上传后自动解析、切片和向量化；失败任务保留原因并支持重试。</p>
+        <p>上传后自动完成解析、切片和向量入库；“已入库”表示可以直接检索与问答。</p>
       </div>
       <div class="head-actions">
         <el-select v-model="selected" placeholder="选择知识库" style="width: 220px">
@@ -128,7 +128,7 @@ function tag(status: string) {
 
     <div class="inline-stats">
       <span>文档总数 <b>{{ list.length }}</b></span>
-      <span>已就绪 <b>{{ ready }}</b></span>
+      <span>已入库 <b>{{ ready }}</b></span>
       <span v-if="hasActiveTasks" class="muted">任务状态每 2 秒自动刷新</span>
     </div>
 
@@ -138,7 +138,7 @@ function tag(status: string) {
       <el-table-column label="大小" width="120">
         <template #default="{ row }">{{ (row.fileSize / 1024).toFixed(1) }} KB</template>
       </el-table-column>
-      <el-table-column label="状态" width="120">
+      <el-table-column label="入库状态" width="120">
         <template #default="{ row }"><el-tag :type="tag(row.status)">{{ STATUS_TEXT[row.status] ?? row.status }}</el-tag></template>
       </el-table-column>
       <el-table-column prop="chunkCount" label="切片" width="90" />
