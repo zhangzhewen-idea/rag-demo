@@ -55,7 +55,6 @@ async function remove(id: number) {
     </header>
     <el-table v-loading="loading" :data="list" class="glass-table">
       <el-table-column prop="title" label="会话标题" min-width="280" />
-      <el-table-column prop="knowledgeBaseId" label="知识库 ID" width="130" />
       <el-table-column prop="status" label="状态" width="120"><template #default="{ row }"><el-tag type="success">{{ row.status === 'ACTIVE' ? '进行中' : row.status }}</el-tag></template></el-table-column>
       <el-table-column label="操作" width="250"><template #default="{ row }"><el-button text type="primary" @click="router.push(`/chat/${row.id}`)">继续问答</el-button><el-button text @click="rename(row)">重命名</el-button><el-button text type="danger" @click="remove(row.id)">删除</el-button></template></el-table-column>
     </el-table>
