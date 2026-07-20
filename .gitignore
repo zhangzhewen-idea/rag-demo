@@ -5,6 +5,7 @@ out/
 !**/src/main/**/target/
 !**/src/test/**/target/
 data/
+log/
 
 ### STS ###
 .apt_generated

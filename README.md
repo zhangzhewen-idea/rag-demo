@@ -37,6 +37,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 25)
 ```
 
 ```bash
+cd rag-demo-backend
 ./mvnw -version
 ./mvnw test
 ./mvnw spring-boot:run
@@ -56,4 +57,3 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 25)
 - 无可靠证据固定回答：`当前知识库中未找到可靠依据`。
 
 模型或维度改变后必须删除并重建整个 `rag-demo-index`，不能混用不同维度。
-
