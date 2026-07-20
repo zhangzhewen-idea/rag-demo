@@ -245,7 +245,7 @@ READY/FAILED -> DELETING -> 逻辑删除
 
 - 先校验会话归属和知识库启用状态。
 - 通过 `knowledgeBaseId` 精确过滤 Redis Vector Store。
-- 默认 `Top-K = 6`，相似度阈值为 `0.60`，两者均通过配置文件暴露。
+- 默认 `Top-K = 6`，相似度阈值为 `0.75`，两者均通过配置文件暴露；阈值可使用 `RAG_SIMILARITY_THRESHOLD` 按评测结果调整。
 - 应用层显式调用检索 Gateway 并保留命中的 Spring AI `Document`，不把检索结果完全隐藏在 Advisor 内，以便生成和保存引用。
 
 ### 8.3 提示词与证据约束

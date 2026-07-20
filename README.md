@@ -53,7 +53,7 @@ cd rag-demo-backend
 
 - Chat：`qwen3.7-plus`。
 - Embedding：`qwen3.7-text-embedding`，固定 2560 维。
-- 默认 Top-K：6，相似度阈值：0.60。
+- 默认 Top-K：6，相似度阈值：0.75；可通过 `RAG_SIMILARITY_THRESHOLD` 调整。
 - 无可靠证据固定回答：`当前知识库中未找到可靠依据`。
 
 模型或维度改变后必须删除并重建整个 `rag-demo-index`，不能混用不同维度。
