@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: rag-demo-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3308/rag_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
+  ai:
+    openai:
+      api-key: ${DASHSCOPE_API_KEY:local-placeholder}
+      base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      chat:
+        options:
+          model: qwen3.7-plus
+      embedding:
+        options:
+          model: qwen3.7-text-embedding
+          dimensions: 2560
+    vectorstore:
+      redis:
+        initialize-schema: ${RAG_VECTOR_INITIALIZE_SCHEMA:true}
+        index-name: rag-demo-index
+        prefix: "rag:chunk:"
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+rag:
+  storage-root: ${RAG_STORAGE_ROOT:/Users/zhangzhewen/data/ragdemo/uploads}
+  jwt:
+    secret: ${JWT_SECRET:change-this-development-secret-at-least-32-bytes}
+    access-ttl: 30m
+    refresh-ttl: 7d
+  retrieval:
+    top-k: ${RAG_TOP_K:6}
+    similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.60}
+  ingestion:
+    chunk-size: 800
+    chunk-overlap: 100
+    embedding-batch-size: 20
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
