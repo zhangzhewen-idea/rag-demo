@@ -13,6 +13,7 @@ public interface DocumentGateway {
     /** 条件抢占状态，保证任务幂等。 */ boolean transit(Long id, DocumentStatus expected, DocumentStatus target);
     /** 标记入库完成。 */ void markReady(Long id, int chunkCount);
     /** 标记失败。 */ void markFailed(Long id, String stage, String reason, boolean incrementRetry);
+    /** 将上次进程中断遗留的任务标记为失败。 */ int failInterruptedTasks();
     /** 完成逻辑删除。 */ void logicalDelete(Long id);
     /** 判断是否存在处理中任务。 */ boolean hasProcessing(Long knowledgeBaseId);
 }

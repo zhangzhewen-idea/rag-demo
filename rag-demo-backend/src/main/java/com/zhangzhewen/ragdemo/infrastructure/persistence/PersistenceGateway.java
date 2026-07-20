@@ -88,6 +88,7 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
     @Override public boolean transit(Long id, DocumentStatus expected, DocumentStatus target) { return jdbc.update("UPDATE kb_document SET status=?,failure_stage=NULL,failure_reason=NULL WHERE id=? AND status=? AND deleted=0",target.name(),id,expected.name())==1; }
     @Override public void markReady(Long id, int chunkCount) { jdbc.update("UPDATE kb_document SET status='READY',chunk_count=?,failure_stage=NULL,failure_reason=NULL WHERE id=? AND status='PROCESSING'",chunkCount,id); }
     @Override public void markFailed(Long id, String stage, String reason, boolean incrementRetry) { jdbc.update("UPDATE kb_document SET status='FAILED',failure_stage=?,failure_reason=?,retry_count=retry_count+? WHERE id=?",stage,reason == null ? "未知错误" : reason.substring(0,Math.min(500,reason.length())),incrementRetry?1:0,id); }
+    @Override public int failInterruptedTasks() { return jdbc.update("UPDATE kb_document SET status='FAILED',failure_stage='INTERRUPTED',failure_reason='服务重启导致任务中断，请重试' WHERE deleted=0 AND status IN ('PENDING','PROCESSING')"); }
     @Override public void logicalDelete(Long id) { jdbc.update("UPDATE kb_document SET deleted=1 WHERE id=? AND status='DELETING'",id); }
     @Override public boolean hasProcessing(Long knowledgeBaseId) { Integer count=jdbc.queryForObject("SELECT COUNT(*) FROM kb_document WHERE knowledge_base_id=? AND deleted=0 AND status IN ('PENDING','PROCESSING','DELETING')",Integer.class,knowledgeBaseId); return count!=null&&count>0; }
 
