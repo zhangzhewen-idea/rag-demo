@@ -2,11 +2,13 @@
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
 import { conversationApi } from '@/api'
 import { streamChat } from '@/api/sse'
 import type { Conversation, Message, Reference } from '@/types'
 
 const route = useRoute()
+const auth = useAuthStore()
 const id = Number(route.params.conversationId)
 const conversation = ref<Conversation>()
 const messages = ref<Message[]>([])
@@ -93,9 +95,10 @@ async function copy(text: string) {
         <p>我只会基于可靠证据回答，并标注来源。</p>
       </div>
       <article v-for="(message, index) in messages" :key="message.id" :class="['message', message.role.toLowerCase()]">
-        <div class="avatar">{{ message.role === 'USER' ? '你' : 'AI' }}</div>
+        <el-avatar v-if="message.role === 'USER'" class="avatar" :src="auth.user?.avatarUrl">{{ auth.user?.nickname?.slice(0, 1) || '你' }}</el-avatar>
+        <div v-else class="avatar">AI</div>
         <div class="bubble">
-          <p>{{ message.content }}<span v-if="generating && message === messages.at(-1)" class="cursor" /></p>
+          <p><span v-if="generating && message === messages.at(-1) && !message.content" class="thinking">正在思考，请稍作等待…</span><template v-else>{{ message.content }}</template><span v-if="generating && message === messages.at(-1) && message.content" class="cursor" /></p>
           <div v-if="message.role === 'ASSISTANT' && message.content" class="message-actions">
             <el-button text size="small" @click="copy(message.content)">复制</el-button>
             <el-button v-if="message.status === 'FAILED'" text size="small" type="primary" @click="reuseQuestion(index)">重新提问</el-button>
@@ -121,3 +124,7 @@ async function copy(text: string) {
     </el-drawer>
   </div>
 </template>
+
+<style scoped>
+.thinking { color: #756e7d; }
+</style>

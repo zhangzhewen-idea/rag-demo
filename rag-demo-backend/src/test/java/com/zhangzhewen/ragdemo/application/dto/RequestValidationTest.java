@@ -18,7 +18,7 @@ class RequestValidationTest {
 
     /** 新增用户应同时校验账号、昵称和角色。 */
     @Test void validatesCreateUserFields() {
-        var request = new UserDtos.CreateRequest("", "", "123456", "ENABLED", Set.of());
+        var request = new UserDtos.CreateRequest("", "", "123456", null, "ENABLED", Set.of());
         assertThat(validator.validate(request)).extracting(v -> v.getMessage())
                 .contains("请输入账号", "请输入昵称", "请至少选择一个角色");
     }

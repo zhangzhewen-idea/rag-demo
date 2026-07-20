@@ -48,12 +48,12 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
         Arrays.stream(raw.split(",")).map(Role::valueOf).forEach(roles::add);
         return Set.copyOf(roles);
     }
-    @Override @Transactional public Long create(String username, String password, String nickname, UserStatus status, Set<Role> roles) {
-        long id = insert("INSERT INTO sys_user(username,password,nickname,status) VALUES(?,?,?,?)", username, password, nickname, status.name());
+    @Override @Transactional public Long create(String username, String password, String nickname, String avatarUrl, UserStatus status, Set<Role> roles) {
+        long id = insert("INSERT INTO sys_user(username,password,nickname,avatar_url,status) VALUES(?,?,?,?,?)", username, password, nickname, avatarUrl, status.name());
         replaceRoles(id, roles); return id;
     }
-    @Override @Transactional public void update(Long id, String nickname, UserStatus status, Set<Role> roles) {
-        jdbc.update("UPDATE sys_user SET nickname=?,status=? WHERE id=? AND deleted=0", nickname, status.name(), id); replaceRoles(id, roles);
+    @Override @Transactional public void update(Long id, String nickname, String avatarUrl, UserStatus status, Set<Role> roles) {
+        jdbc.update("UPDATE sys_user SET nickname=?,avatar_url=?,status=? WHERE id=? AND deleted=0", nickname, avatarUrl, status.name(), id); replaceRoles(id, roles);
     }
     private void replaceRoles(Long userId, Set<Role> roles) {
         jdbc.update("DELETE FROM sys_user_role WHERE user_id=?", userId);

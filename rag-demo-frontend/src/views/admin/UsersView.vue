@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadRequestOptions } from 'element-plus'
 import { adminApi } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import type { User } from '@/types'
 
 interface UserForm {
@@ -10,14 +11,16 @@ interface UserForm {
   password: string
   status: string
   roles: string[]
+  avatarUrl: string
 }
 
 const list = ref<User[]>([])
 const dialog = ref(false)
 const editing = ref<number>()
 const saving = ref(false)
+const uploadingAvatar = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive<UserForm>({ username: '', nickname: '', password: '123456', status: 'ENABLED', roles: ['USER'] })
+const form = reactive<UserForm>({ username: '', nickname: '', password: '123456', status: 'ENABLED', roles: ['USER'], avatarUrl: '' })
 const rules: FormRules<UserForm> = {
   username: [
     { required: true, whitespace: true, message: '请输入账号', trigger: 'blur' },
@@ -46,7 +49,7 @@ async function load() {
 
 function open(item?: User) {
   editing.value = item?.id
-  Object.assign(form, item ? { ...item, password: '', roles: [...item.roles] } : { username: '', nickname: '', password: '123456', status: 'ENABLED', roles: ['USER'] })
+  Object.assign(form, item ? { ...item, avatarUrl: item.avatarUrl ?? '', password: '', roles: [...item.roles] } : { username: '', nickname: '', password: '123456', status: 'ENABLED', roles: ['USER'], avatarUrl: '' })
   dialog.value = true
   nextTick(() => formRef.value?.clearValidate())
 }
@@ -62,7 +65,11 @@ async function save() {
   if (!await formRef.value?.validate().catch(() => false)) return
   saving.value = true
   try {
-    if (editing.value) await adminApi.updateUser(editing.value, { nickname: form.nickname, status: form.status, roles: form.roles })
+    if (editing.value) {
+      await adminApi.updateUser(editing.value, { nickname: form.nickname, status: form.status, roles: form.roles, avatarUrl: form.avatarUrl })
+      const auth = useAuthStore()
+      if (editing.value === auth.user?.id) await auth.reloadUser()
+    }
     else await adminApi.createUser(form)
     dialog.value = false
     ElMessage.success('保存成功')
@@ -71,6 +78,20 @@ async function save() {
     ElMessage.error((error as Error).message)
   } finally {
     saving.value = false
+  }
+}
+
+async function uploadAvatar(options: UploadRequestOptions) {
+  uploadingAvatar.value = true
+  try {
+    const result = await adminApi.uploadAvatar(options.file)
+    form.avatarUrl = result.url
+    options.onSuccess(result)
+    ElMessage.success('头像上传成功')
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  } finally {
+    uploadingAvatar.value = false
   }
 }
 
@@ -93,6 +114,7 @@ async function reset(id: number) {
     </header>
     <el-table :data="list" class="glass-table">
       <el-table-column prop="username" label="账号" />
+      <el-table-column label="用户头像" width="110"><template #default="{ row }"><el-avatar :src="row.avatarUrl">{{ row.nickname?.slice(0, 1) }}</el-avatar></template></el-table-column>
       <el-table-column prop="nickname" label="昵称" />
       <el-table-column label="角色"><template #default="{ row }"><el-tag v-for="role in row.roles" :key="role" class="role-tag">{{ role }}</el-tag></template></el-table-column>
       <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ row.status }}</el-tag></template></el-table-column>
@@ -102,6 +124,7 @@ async function reset(id: number) {
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="save">
         <el-form-item label="账号" prop="username"><el-input v-model="form.username" :disabled="!!editing" maxlength="64" /></el-form-item>
         <el-form-item label="昵称" prop="nickname"><el-input v-model="form.nickname" maxlength="64" /></el-form-item>
+        <el-form-item label="用户头像"><el-upload class="avatar-uploader" :show-file-list="false" accept="image/png,image/jpeg,image/webp" :http-request="uploadAvatar"><el-avatar v-if="form.avatarUrl" :size="72" :src="form.avatarUrl" /><el-button v-else :loading="uploadingAvatar">选择图片</el-button></el-upload><small class="avatar-help">支持 PNG、JPEG、WebP，最大 5 MB</small></el-form-item>
         <el-form-item v-if="!editing" label="初始密码" prop="password"><el-input v-model="form.password" type="password" show-password maxlength="100" /></el-form-item>
         <el-form-item label="状态"><el-radio-group v-model="form.status"><el-radio-button value="ENABLED">启用</el-radio-button><el-radio-button value="DISABLED">停用</el-radio-button></el-radio-group></el-form-item>
         <el-form-item label="角色" prop="roles"><el-checkbox-group v-model="form.roles"><el-checkbox value="USER">普通用户</el-checkbox><el-checkbox value="ADMIN">管理员</el-checkbox></el-checkbox-group></el-form-item>
@@ -110,3 +133,8 @@ async function reset(id: number) {
     </el-dialog>
   </div>
 </template>
+
+<style scoped>
+.avatar-uploader { display: block; }
+.avatar-help { display: block; margin-top: 8px; color: #827c89; }
+</style>

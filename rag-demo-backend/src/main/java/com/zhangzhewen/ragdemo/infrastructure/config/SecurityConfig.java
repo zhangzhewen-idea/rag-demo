@@ -26,7 +26,7 @@ public class SecurityConfig {
     /** 配置角色、异常响应与 JWT 过滤器。 */
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http,JwtAuthenticationFilter jwt,ObjectMapper mapper)throws Exception{
         http.csrf(csrf->csrf.disable()).cors(Customizer.withDefaults()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a->a.dispatcherTypeMatchers(DispatcherType.ASYNC,DispatcherType.ERROR).permitAll().requestMatchers("/api/auth/login","/api/auth/refresh","/actuator/health").permitAll().requestMatchers("/api/admin/**").hasRole("ADMIN").anyRequest().authenticated())
+            .authorizeHttpRequests(a->a.dispatcherTypeMatchers(DispatcherType.ASYNC,DispatcherType.ERROR).permitAll().requestMatchers("/api/auth/login","/api/auth/refresh","/api/covers/**","/api/avatars/**","/actuator/health").permitAll().requestMatchers("/api/admin/**").hasRole("ADMIN").anyRequest().authenticated())
             .exceptionHandling(e->e.authenticationEntryPoint((req,res,ex)->writeError(res,mapper,401,"AUTH_REQUIRED","请先登录")).accessDeniedHandler((req,res,ex)->writeError(res,mapper,403,"FORBIDDEN","没有访问权限")))
             .addFilterBefore(jwt,UsernamePasswordAuthenticationFilter.class);
         return http.build();
