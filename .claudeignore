@@ -1,6 +1,5 @@
 # 版本控制与 IDE 元数据
 .git/
-.codegraph/
 **/.idea/
 .DS_Store
 
