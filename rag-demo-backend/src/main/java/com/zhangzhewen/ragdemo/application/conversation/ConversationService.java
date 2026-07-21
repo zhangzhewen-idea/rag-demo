@@ -8,11 +8,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
-import com.zhangzhewen.ragdemo.domain.gateway.DocumentGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
-import com.zhangzhewen.ragdemo.domain.knowledge.DocumentStatus;
-import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeDocument;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
@@ -31,19 +27,17 @@ public class ConversationService {
   private final DocumentSearchGateway search;
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
-  private final DocumentGateway documents;
   private final RetrievalPolicy policy;
 
   /**
    * 注入用例依赖。
    */
   public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
-      AiGateway ai, KnowledgeGateway knowledge, DocumentGateway documents, RetrievalPolicy policy) {
+      AiGateway ai, KnowledgeGateway knowledge, RetrievalPolicy policy) {
     this.conversations = conversations;
     this.search = search;
     this.ai = ai;
     this.knowledge = knowledge;
-    this.documents = documents;
     this.policy = policy;
   }
 
@@ -97,8 +91,7 @@ public class ConversationService {
     List<Message> history = conversations.recentMessages(conversationId, 20);
     conversations.saveMessage(conversationId, "USER", question, "COMPLETED", null, null, null);
     long start = System.nanoTime();
-    boolean overview = isOverviewQuestion(question);
-    List<RetrievedChunk> refs = retrieve(c.knowledgeBaseId(), question, history, overview);
+    List<RetrievedChunk> refs = retrieve(c.knowledgeBaseId(), question, history);
     if (refs.isEmpty()) {
       delta.accept(NO_EVIDENCE);
       Long id = conversations.saveMessage(conversationId, "ASSISTANT", NO_EVIDENCE, "COMPLETED",
@@ -121,22 +114,9 @@ public class ConversationService {
   }
 
   private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
-      List<Message> history, boolean overview) {
-    if (!overview) {
-      return search.search(knowledgeBaseId, contextualQuery(question, history), policy.topK(),
-          policy.similarityThreshold());
-    }
-    int perDocumentTopK = Math.max(2, Math.min(4, policy.topK() / 2));
-    List<RetrievedChunk> result = new ArrayList<>();
-    for (KnowledgeDocument document : documents.listByKnowledgeBase(knowledgeBaseId)) {
-      if (document.status() != DocumentStatus.READY) {
-        continue;
-      }
-      String query = document.originalName() + " 主要内容 核心要点 完整概览";
-      result.addAll(search.searchDocument(knowledgeBaseId, document.id(), query, perDocumentTopK,
-          policy.similarityThreshold()));
-    }
-    return result;
+      List<Message> history) {
+    return search.search(knowledgeBaseId, contextualQuery(question, history), policy.topK(),
+        policy.similarityThreshold());
   }
 
   private String contextualQuery(String question, List<Message> history) {
@@ -155,17 +135,6 @@ public class ConversationService {
       }
     }
     return question;
-  }
-
-  private boolean isOverviewQuestion(String question) {
-    String normalized = normalize(question);
-    boolean asksCapability = normalized.matches(
-        "^(你)?(都)?(知道|了解|掌握)(些)?(什么|哪些|多少)(内容|知识|信息|资料)?$")
-        || normalized.matches("^(你)?能(回答|介绍)(些)?(什么|哪些)(内容|知识|信息|资料)?$");
-    return asksCapability || normalized.equals("知识库有什么")
-        || normalized.contains("有哪些内容") || normalized.contains("全部内容")
-        || normalized.contains("所有内容") || normalized.contains("完整概览")
-        || normalized.contains("全面介绍") || normalized.contains("概括知识库");
   }
 
   private String normalize(String value) {
