@@ -3,6 +3,7 @@ package com.zhangzhewen.ragdemo.application.conversation;
 import com.zhangzhewen.ragdemo.application.BusinessException;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
+import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
@@ -10,6 +11,7 @@ import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentRerankGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.QueryExpansionGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.QueryRewriteGateway;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +33,7 @@ public class ConversationService {
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
   private final QueryRewriteGateway queryRewrite;
+  private final QueryExpansionGateway queryExpansion;
   private final RetrievalPolicy policy;
 
   /**
@@ -38,13 +41,15 @@ public class ConversationService {
    */
   public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
       DocumentRerankGateway rerank, AiGateway ai, KnowledgeGateway knowledge,
-      QueryRewriteGateway queryRewrite, RetrievalPolicy policy) {
+      QueryRewriteGateway queryRewrite, QueryExpansionGateway queryExpansion,
+      RetrievalPolicy policy) {
     this.conversations = conversations;
     this.search = search;
     this.rerank = rerank;
     this.ai = ai;
     this.knowledge = knowledge;
     this.queryRewrite = queryRewrite;
+    this.queryExpansion = queryExpansion;
     this.policy = policy;
   }
 
@@ -123,8 +128,11 @@ public class ConversationService {
   private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
       List<Message> history) {
     String rewritten = queryRewrite.rewrite(contextualQuery(question, history));
-    List<RetrievedChunk> candidates = search.search(knowledgeBaseId, rewritten,
-        policy.candidateTopK(), policy.similarityThreshold());
+    List<List<RetrievedChunk>> rankings = queryExpansion.expand(rewritten).stream()
+        .map(query -> search.search(knowledgeBaseId, query, policy.candidateTopK(),
+            policy.similarityThreshold()))
+        .toList();
+    List<RetrievedChunk> candidates = ReciprocalRankFusion.fuse(rankings, policy.candidateTopK());
     if (candidates.isEmpty()) {
       return candidates;
     }
