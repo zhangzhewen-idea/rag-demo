@@ -1,2 +1,3 @@
-import { afterEach,vi } from 'vitest'
-afterEach(()=>vi.restoreAllMocks())
+import {afterEach, vi} from 'vitest'
+
+afterEach(() => vi.restoreAllMocks())

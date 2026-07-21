@@ -2,7 +2,9 @@
 
 ## 上下文加载
 
-必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`architecture.md` 和 `quality-gates.md`，再读取待审 diff、相关调用路径、测试、配置与设计。只有需要复现时加载 `commands.md` 中对应命令。
+必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`architecture.md` 和
+`quality-gates.md`，再读取待审 diff、相关调用路径、测试、配置与设计。只有需要复现时加载 `commands.md`
+中对应命令。
 
 ## 执行步骤
 

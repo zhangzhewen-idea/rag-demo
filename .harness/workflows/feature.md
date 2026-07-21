@@ -2,14 +2,16 @@
 
 ## 上下文加载
 
-必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`architecture.md`、`commands.md` 和 `quality-gates.md`，再读取功能涉及的设计、现有实现、测试和接口调用方。
+必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`architecture.md`、`commands.md`
+和 `quality-gates.md`，再读取功能涉及的设计、现有实现、测试和接口调用方。
 
 ## 执行步骤
 
 1. 明确用户可观察目标、影响模块、接口和数据边界，检查 Git 状态及已有改动。
 2. 找到最接近的现有用例和测试，给出简短计划；范围清晰时直接执行。
 3. 先定义或补充能证明行为的最小测试，再按 COLA 职责放置实现。
-4. 涉及外部能力时先定义或复用 `domain/gateway`，在 `infrastructure` 实现；adapter 只暴露 application 用例。
+4. 涉及外部能力时先定义或复用 `domain/gateway`，在 `infrastructure` 实现；adapter 只暴露 application
+   用例。
 5. 接口联动时同步后端 DTO、前端类型/API/调用方和契约测试。
 6. 先运行最小测试，再执行完整质量门禁，修复自身改动引起的问题。
 7. 审查最终 diff 和工作区，展示提交摘要，只提交本功能文件。

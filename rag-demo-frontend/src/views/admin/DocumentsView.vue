@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi } from '@/api'
-import type { DocumentTask, KnowledgeBase } from '@/types'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {ElMessage, ElMessageBox} from 'element-plus'
+import {adminApi} from '@/api'
+import type {DocumentTask, KnowledgeBase} from '@/types'
 
 const POLL_INTERVAL = 2_000
 const ACTIVE_STATUSES = new Set(['PENDING', 'PROCESSING', 'DELETING'])
@@ -98,13 +98,19 @@ async function retry(id: number) {
 }
 
 async function remove(id: number) {
-  await ElMessageBox.confirm('将同时删除向量与物理文件，确认继续？', '删除文档', { type: 'warning' })
+  await ElMessageBox.confirm('将同时删除向量与物理文件，确认继续？', '删除文档', {type: 'warning'})
   await adminApi.removeDocument(id)
   await load(false)
 }
 
 function tag(status: string) {
-  return ({ READY: 'success', FAILED: 'danger', PROCESSING: 'warning', PENDING: 'info', DELETING: 'warning' } as const)[status as keyof typeof STATUS_TEXT] ?? 'info'
+  return ({
+    READY: 'success',
+    FAILED: 'danger',
+    PROCESSING: 'warning',
+    PENDING: 'info',
+    DELETING: 'warning'
+  } as const)[status as keyof typeof STATUS_TEXT] ?? 'info'
 }
 </script>
 
@@ -118,7 +124,7 @@ function tag(status: string) {
       </div>
       <div class="head-actions">
         <el-select v-model="selected" placeholder="选择知识库" style="width: 220px">
-          <el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id" />
+          <el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id"/>
         </el-select>
         <el-upload :show-file-list="false" :accept="accept" :http-request="upload">
           <el-button type="primary" :loading="uploading" :disabled="!selected">上传文档</el-button>
@@ -133,25 +139,33 @@ function tag(status: string) {
     </div>
 
     <el-table v-loading="loading" :data="list" class="glass-table">
-      <el-table-column prop="originalName" label="文件名" min-width="250" />
-      <el-table-column prop="extension" label="类型" width="90" />
+      <el-table-column prop="originalName" label="文件名" min-width="250"/>
+      <el-table-column prop="extension" label="类型" width="90"/>
       <el-table-column label="大小" width="120">
         <template #default="{ row }">{{ (row.fileSize / 1024).toFixed(1) }} KB</template>
       </el-table-column>
       <el-table-column label="入库状态" width="120">
-        <template #default="{ row }"><el-tag :type="tag(row.status)">{{ STATUS_TEXT[row.status] ?? row.status }}</el-tag></template>
+        <template #default="{ row }">
+          <el-tag :type="tag(row.status)">{{ STATUS_TEXT[row.status] ?? row.status }}</el-tag>
+        </template>
       </el-table-column>
-      <el-table-column prop="chunkCount" label="切片" width="90" />
+      <el-table-column prop="chunkCount" label="切片" width="90"/>
       <el-table-column label="失败原因" min-width="220">
-        <template #default="{ row }"><span class="error-text">{{ row.failureReason || '-' }}</span></template>
+        <template #default="{ row }"><span class="error-text">{{ row.failureReason || '-' }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="操作" width="160">
         <template #default="{ row }">
-          <el-button v-if="row.status === 'FAILED'" text type="primary" @click="retry(row.id)">重试</el-button>
-          <el-button text type="danger" :disabled="ACTIVE_STATUSES.has(row.status)" @click="remove(row.id)">删除</el-button>
+          <el-button v-if="row.status === 'FAILED'" text type="primary" @click="retry(row.id)">
+            重试
+          </el-button>
+          <el-button text type="danger" :disabled="ACTIVE_STATUSES.has(row.status)"
+                     @click="remove(row.id)">删除
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
-    <el-empty v-if="selected && !loading && !list.length" description="暂无文档，上传一个开始构建知识库" />
+    <el-empty v-if="selected && !loading && !list.length"
+              description="暂无文档，上传一个开始构建知识库"/>
   </div>
 </template>

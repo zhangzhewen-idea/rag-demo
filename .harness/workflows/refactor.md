@@ -2,7 +2,8 @@
 
 ## 上下文加载
 
-必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`architecture.md`、`commands.md` 和 `quality-gates.md`，再读取重构目标、现有调用路径、测试和公开契约。
+必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`architecture.md`、`commands.md`
+和 `quality-gates.md`，再读取重构目标、现有调用路径、测试和公开契约。
 
 ## 执行步骤
 

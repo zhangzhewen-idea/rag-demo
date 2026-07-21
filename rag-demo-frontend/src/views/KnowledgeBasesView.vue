@@ -1,2 +1,44 @@
-<script setup lang="ts">import { onMounted,ref } from 'vue';import { useRouter } from 'vue-router';import { knowledgeApi,conversationApi } from '@/api';import { ElMessage } from 'element-plus';import type { KnowledgeBase } from '@/types';const list=ref<KnowledgeBase[]>([]),loading=ref(true),router=useRouter();onMounted(async()=>{try{list.value=await knowledgeApi.list()}finally{loading.value=false}});async function start(kb:KnowledgeBase){try{const result=await conversationApi.create(kb.id,`${kb.name}问答`);router.push(`/chat/${result.id}`)}catch(e){ElMessage.error((e as Error).message)}}</script>
-<template><div class="page"><header class="page-head"><div><span class="eyebrow">KNOWLEDGE BASES</span><h1>选择知识库</h1><p>每个会话绑定一个知识库，答案会检索其中全部就绪文档。</p></div></header><div v-loading="loading" class="card-grid large"><article v-for="kb in list" :key="kb.id" class="kb-card cover"><div class="kb-cover"><img v-if="kb.coverUrl" :src="kb.coverUrl" :alt="kb.name" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"/><span v-else>RAG</span></div><div><h3>{{kb.name}}</h3><p>{{kb.description||'暂无描述'}}</p><el-button type="primary" @click="start(kb)">创建问答会话</el-button></div></article></div><el-empty v-if="!loading&&!list.length" description="暂无已启用知识库"/></div></template>
+<script setup lang="ts">import {onMounted, ref} from 'vue';
+import {useRouter} from 'vue-router';
+import {conversationApi, knowledgeApi} from '@/api';
+import {ElMessage} from 'element-plus';
+import type {KnowledgeBase} from '@/types';
+
+const list = ref<KnowledgeBase[]>([]), loading = ref(true), router = useRouter();
+onMounted(async () => {
+  try {
+    list.value = await knowledgeApi.list()
+  } finally {
+    loading.value = false
+  }
+});
+
+async function start(kb: KnowledgeBase) {
+  try {
+    const result = await conversationApi.create(kb.id, `${kb.name}问答`);
+    router.push(`/chat/${result.id}`)
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}</script>
+<template>
+  <div class="page">
+    <header class="page-head">
+      <div><span class="eyebrow">KNOWLEDGE BASES</span>
+        <h1>选择知识库</h1>
+        <p>每个会话绑定一个知识库，答案会检索其中全部就绪文档。</p></div>
+    </header>
+    <div v-loading="loading" class="card-grid large">
+      <article v-for="kb in list" :key="kb.id" class="kb-card cover">
+        <div class="kb-cover"><img v-if="kb.coverUrl" :src="kb.coverUrl" :alt="kb.name"
+                                   style="width:100%;height:100%;object-fit:cover;border-radius:inherit"/><span
+            v-else>RAG</span></div>
+        <div><h3>{{ kb.name }}</h3>
+          <p>{{ kb.description || '暂无描述' }}</p>
+          <el-button type="primary" @click="start(kb)">创建问答会话</el-button>
+        </div>
+      </article>
+    </div>
+    <el-empty v-if="!loading&&!list.length" description="暂无已启用知识库"/>
+  </div>
+</template>

@@ -2,7 +2,9 @@
 
 ## 1. 背景与目标
 
-在当前仓库中新增一个前后端分离的教学型 RAG 企业内部知识库问答系统，项目名称固定为“张喆闻 RAG企业知识库问答系统”。系统应形成完整业务闭环，同时控制复杂度，适合学习 Spring AI 2.0、COLA light、文档向量化、Redis Stack 检索和 Vue 3 管理后台。
+在当前仓库中新增一个前后端分离的教学型 RAG 企业内部知识库问答系统，项目名称固定为“张喆闻
+RAG企业知识库问答系统”。系统应形成完整业务闭环，同时控制复杂度，适合学习 Spring AI 2.0、COLA
+light、文档向量化、Redis Stack 检索和 Vue 3 管理后台。
 
 项目对应现有的两个一级目录：
 
@@ -43,7 +45,8 @@
 - Apache Tika 3.x。
 - Maven Wrapper。
 
-Spring AI 2.0 通过官方 OpenAI 模型抽象连接阿里云百炼 OpenAI 兼容接口，不引入当前仅兼容 Spring AI 1.1.x 的 Spring AI Alibaba Starter。
+Spring AI 2.0 通过官方 OpenAI 模型抽象连接阿里云百炼 OpenAI 兼容接口，不引入当前仅兼容 Spring AI
+1.1.x 的 Spring AI Alibaba Starter。
 
 ### 3.2 前端
 
@@ -97,13 +100,15 @@ rag-demo-backend/src/main/java/com/zhangzhewen/ragdemo
 - `domain`：用户、角色、知识库、文档、会话、消息、状态转换、策略和 Gateway 接口。
 - `infrastructure`：MyBatis、MyBatis-Plus、Redis、文件系统、解析器和模型客户端等 Gateway 实现。
 
-使用 ArchUnit 保护依赖方向，禁止 `domain` 依赖其他三层，禁止 `application` 和 `adapter` 直接依赖 `infrastructure`。
+使用 ArchUnit 保护依赖方向，禁止 `domain` 依赖其他三层，禁止 `application` 和 `adapter` 直接依赖
+`infrastructure`。
 
 ## 5. 领域模型与数据设计
 
 ### 5.1 MySQL 表
 
-所有业务表使用 `BIGINT` 主键，并包含 `created_at`、`updated_at`。需要逻辑删除的表增加 `deleted` 字段，由 MyBatis-Plus 管理。
+所有业务表使用 `BIGINT` 主键，并包含 `created_at`、`updated_at`。需要逻辑删除的表增加 `deleted` 字段，由
+MyBatis-Plus 管理。
 
 #### `sys_user`
 
@@ -178,7 +183,8 @@ Redis Stack 同时承担以下职责：
 - Spring AI `RedisVectorStore` 的文档切片与向量索引。
 - Refresh Token、JWT 退出失效标记、登录失败计数和轻量缓存。
 
-向量索引建议使用名称 `rag-demo-index` 和前缀 `rag:chunk:`，使用 HNSW、COSINE 距离和固定 `DIM = 2560`。每个切片至少保存以下元数据：
+向量索引建议使用名称 `rag-demo-index` 和前缀 `rag:chunk:`，使用 HNSW、COSINE 距离和固定 `DIM = 2560`
+。每个切片至少保存以下元数据：
 
 - `knowledgeBaseId`：TAG，用于会话级精确过滤。
 - `documentId`：TAG，用于删除、重试和重建。
@@ -209,13 +215,15 @@ Redis 认证相关 Key 使用 `rag:auth:` 前缀，登录失败计数使用 `rag
 
 ### 7.2 解析器分工
 
-- `.md` 使用 `org.springframework.ai:spring-ai-markdown-document-reader` 中的 `MarkdownDocumentReader`，保留可用于引用的标题信息。
+- `.md` 使用 `org.springframework.ai:spring-ai-markdown-document-reader` 中的
+  `MarkdownDocumentReader`，保留可用于引用的标题信息。
 - `.txt`、`.pdf`、`.doc`、`.docx` 使用 Apache Tika 3.x。
 - Tika 能解析 OLE2 `.doc` 和 OOXML `.docx`。PDF 仅在解析器能可靠提供页信息时记录页码，否则引用不显示页码。
 
 ### 7.3 异步状态流转
 
-上传接口完成安全校验和落盘后，插入 `PENDING` 文档并立即返回。Spring `@Async` 使用独立线程池处理后续流程，教学默认值为核心线程 2、最大线程 4、队列 100。
+上传接口完成安全校验和落盘后，插入 `PENDING` 文档并立即返回。Spring `@Async` 使用独立线程池处理后续流程，教学默认值为核心线程
+2、最大线程 4、队列 100。
 
 ```text
 PENDING -> PROCESSING -> READY
@@ -223,7 +231,8 @@ PENDING -> PROCESSING -> READY
 READY/FAILED -> DELETING -> 逻辑删除
 ```
 
-任务通过文档状态和条件更新实现幂等，同一文档不能被并发重复处理。失败时保存阶段、简要原因和重试次数，并按 `documentId` 删除本次已写入的向量，原文件保留供管理员重试。
+任务通过文档状态和条件更新实现幂等，同一文档不能被并发重复处理。失败时保存阶段、简要原因和重试次数，并按
+`documentId` 删除本次已写入的向量，原文件保留供管理员重试。
 
 ### 7.4 切片与向量化
 
@@ -245,8 +254,10 @@ READY/FAILED -> DELETING -> 逻辑删除
 
 - 先校验会话归属和知识库启用状态。
 - 通过 `knowledgeBaseId` 精确过滤 Redis Vector Store。
-- 默认 `Top-K = 6`，相似度阈值为 `0.75`，两者均通过配置文件暴露；阈值可使用 `RAG_SIMILARITY_THRESHOLD` 按评测结果调整。
-- 应用层显式调用检索 Gateway 并保留命中的 Spring AI `Document`，不把检索结果完全隐藏在 Advisor 内，以便生成和保存引用。
+- 默认 `Top-K = 6`，相似度阈值为 `0.75`，两者均通过配置文件暴露；阈值可使用 `RAG_SIMILARITY_THRESHOLD`
+  按评测结果调整。
+- 应用层显式调用检索 Gateway 并保留命中的 Spring AI `Document`，不把检索结果完全隐藏在 Advisor
+  内，以便生成和保存引用。
 
 ### 8.3 提示词与证据约束
 
@@ -264,7 +275,8 @@ READY/FAILED -> DELETING -> 逻辑删除
 - `done`：Token 用量、耗时和消息 ID。
 - `error`：稳定错误码、用户可读提示和 `traceId`。
 
-开始向客户端发送 `delta` 后不自动重试整次模型请求，避免重复输出。流完成后保存回答和引用；客户端取消时保存 `CANCELLED` 状态或不完整消息状态，不将其计为成功回答。
+开始向客户端发送 `delta` 后不自动重试整次模型请求，避免重复输出。流完成后保存回答和引用；客户端取消时保存
+`CANCELLED` 状态或不完整消息状态，不将其计为成功回答。
 
 ## 9. 模型接入
 
@@ -302,7 +314,8 @@ READY/FAILED -> DELETING -> 逻辑删除
 e10adc3949ba59abbe56e057f20f883e
 ```
 
-后端提供自定义 Spring Security `PasswordEncoder` 完成兼容。该要求存在已知生产安全风险：MD5 是快速、无工作因子的旧散列算法，不能有效抵抗预计算和离线撞库。代码与文档必须如实标注风险，不得将其描述为生产安全实践。
+后端提供自定义 Spring Security `PasswordEncoder` 完成兼容。该要求存在已知生产安全风险：MD5
+是快速、无工作因子的旧散列算法，不能有效抵抗预计算和离线撞库。代码与文档必须如实标注风险，不得将其描述为生产安全实践。
 
 ### 10.4 机密与日志
 
@@ -335,7 +348,8 @@ e10adc3949ba59abbe56e057f20f883e
 - `/api/admin/knowledge-bases/{id}/documents`：上传和列表。
 - `/api/admin/documents/{id}`：详情、状态、重试和删除。
 
-业务错误由全局异常处理器映射到稳定错误码和 HTTP 状态。SSE 使用独立 `error` 事件，不在已建立的流中返回普通 JSON 包装。
+业务错误由全局异常处理器映射到稳定错误码和 HTTP 状态。SSE 使用独立 `error` 事件，不在已建立的流中返回普通
+JSON 包装。
 
 ## 12. 前端设计
 
@@ -415,7 +429,8 @@ e10adc3949ba59abbe56e057f20f883e
 - Architecture 测试：ArchUnit 保护 COLA 依赖方向。
 - 百炼在线测试使用独立 `live` 标签且默认禁用，常规测试使用模拟模型响应。
 
-基础设施集成测试使用隔离的测试数据和独立 Key 前缀，禁止清理或污染现有开发服务数据。若使用 Testcontainers，仅用于测试生命周期，不改变项目运行时直接连接现有服务的设计。
+基础设施集成测试使用隔离的测试数据和独立 Key 前缀，禁止清理或污染现有开发服务数据。若使用
+Testcontainers，仅用于测试生命周期，不改变项目运行时直接连接现有服务的设计。
 
 ### 15.2 前端
 

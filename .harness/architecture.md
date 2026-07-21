@@ -8,16 +8,19 @@
 adapter -> application -> domain <- infrastructure
 ```
 
-| 层 | 职责 | 禁止事项 |
-|---|---|---|
-| `adapter` | REST/SSE 入口、请求绑定、认证边界、协议转换 | 业务规则、Mapper、外部 SDK、直接依赖 `infrastructure` |
-| `application` | 用例编排、事务边界、DTO 映射、协调 domain 与 gateway | 核心业务决策、持久化细节、直接依赖 `adapter` 或 `infrastructure` |
-| `domain` | Entity、Value Object、Policy、Rule、Domain Service、Gateway 接口 | 依赖 `adapter`、`application`、`infrastructure` 或技术实现 |
-| `infrastructure` | Gateway 实现、数据库、Redis、文件系统、解析器和模型客户端 | 新业务规则、反向依赖 `adapter` 或 `application` |
+| 层                | 职责                                                        | 禁止事项                                              |
+|------------------|-----------------------------------------------------------|---------------------------------------------------|
+| `adapter`        | REST/SSE 入口、请求绑定、认证边界、协议转换                                | 业务规则、Mapper、外部 SDK、直接依赖 `infrastructure`          |
+| `application`    | 用例编排、事务边界、DTO 映射、协调 domain 与 gateway                      | 核心业务决策、持久化细节、直接依赖 `adapter` 或 `infrastructure`    |
+| `domain`         | Entity、Value Object、Policy、Rule、Domain Service、Gateway 接口 | 依赖 `adapter`、`application`、`infrastructure` 或技术实现 |
+| `infrastructure` | Gateway 实现、数据库、Redis、文件系统、解析器和模型客户端                       | 新业务规则、反向依赖 `adapter` 或 `application`              |
 
-`domain/gateway` 用业务能力命名接口，运行时实现放在 `infrastructure`。应用服务依赖接口而非实现。跨实体流程由 application 编排，可复用业务判断下沉 domain；避免 Controller 互调、application service 入口互调和 entity 双向引用。
+`domain/gateway` 用业务能力命名接口，运行时实现放在 `infrastructure`。应用服务依赖接口而非实现。跨实体流程由
+application 编排，可复用业务判断下沉 domain；避免 Controller 互调、application service 入口互调和
+entity 双向引用。
 
-`rag-demo-backend/src/test/java/com/zhangzhewen/ragdemo/ArchitectureTest.java` 是依赖方向的可执行事实。调整分层规则时必须同时更新本文档和架构测试。
+`rag-demo-backend/src/test/java/com/zhangzhewen/ragdemo/ArchitectureTest.java`
+是依赖方向的可执行事实。调整分层规则时必须同时更新本文档和架构测试。
 
 ## 测试放置
 
@@ -31,7 +34,8 @@ adapter -> application -> domain <- infrastructure
 
 - 后端拥有业务规则、授权、持久化和 RAG 流程；前端不复制服务端授权或业务判定。
 - REST 响应保持稳定包装和错误码；SSE 使用 `delta`、`references`、`done`、`error` 具名事件。
-- 修改接口请求、响应、错误码或 SSE 事件时，必须同步检查后端 adapter/application DTO、前端 `src/api`、类型定义、调用方和测试。
+- 修改接口请求、响应、错误码或 SSE 事件时，必须同步检查后端 adapter/application DTO、前端 `src/api`
+  、类型定义、调用方和测试。
 - Access Token 只保存在前端 Pinia 内存；刷新登录态由后端 `HttpOnly` Refresh Cookie 提供。
 
 ## RAG 业务不变量

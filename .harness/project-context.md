@@ -61,4 +61,6 @@ rag-demo/
 4. 已批准业务目标：`docs/2026-07-20-rag-enterprise-knowledge-qa-design.md`。
 5. 项目使用说明：根目录和前端 `README.md`。
 
-发现来源冲突时不得静默选择：以可执行实现描述当前状态，同时指出设计或文档差异。当前已知差异是 README/设计使用 `DASHSCOPE_API_KEY`，而 `application.yml` 的实际配置键为 `OPENAPI_KEY`；修改该契约需要单独评估代码、文档和运行环境。
+发现来源冲突时不得静默选择：以可执行实现描述当前状态，同时指出设计或文档差异。当前已知差异是
+README/设计使用 `DASHSCOPE_API_KEY`，而 `application.yml` 的实际配置键为 `OPENAPI_KEY`
+；修改该契约需要单独评估代码、文档和运行环境。

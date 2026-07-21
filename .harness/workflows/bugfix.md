@@ -2,7 +2,8 @@
 
 ## 上下文加载
 
-必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`commands.md` 和 `quality-gates.md`。涉及分层、接口或 RAG 行为时同时读取 `architecture.md`；再读取故障路径、相关测试和日志结构。
+必读 `constitution.md`、`security-boundaries.md`、`project-context.md`、`commands.md` 和
+`quality-gates.md`。涉及分层、接口或 RAG 行为时同时读取 `architecture.md`；再读取故障路径、相关测试和日志结构。
 
 ## 执行步骤
 

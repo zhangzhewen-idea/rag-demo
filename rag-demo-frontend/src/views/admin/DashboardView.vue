@@ -1,2 +1,84 @@
-<script setup lang="ts">import { nextTick,onMounted,ref } from 'vue';import * as echarts from 'echarts';import { adminApi } from '@/api';const data=ref<Record<string,any>>({}),loading=ref(true);onMounted(async()=>{try{data.value=await adminApi.dashboard();await nextTick();render()}finally{loading.value=false}});function chart(id:string,option:echarts.EChartsOption){const el=document.getElementById(id);if(el)echarts.init(el).setOption(option)}function formatDate(value:unknown){return String(value??'').replace('T',' ').replace(/\.\d{3}Z$/,'')}function render(){const trend=data.value.questionTrend??[],types=data.value.fileTypes??[],popular=data.value.popularKnowledgeBases??[];chart('trend',{tooltip:{},xAxis:{type:'category',data:trend.map((x:any)=>formatDate(x.date))},yAxis:{type:'value'},series:[{type:'line',smooth:true,data:trend.map((x:any)=>x.value),areaStyle:{color:'rgba(116,80,255,.16)'},lineStyle:{color:'#7450ff'}}]});chart('types',{tooltip:{trigger:'item'},series:[{type:'pie',radius:['52%','75%'],data:types,itemStyle:{borderRadius:8,borderWidth:3,borderColor:'#fff'}}]});chart('popular',{tooltip:{},xAxis:{type:'value'},yAxis:{type:'category',data:popular.map((x:any)=>x.name)},series:[{type:'bar',data:popular.map((x:any)=>x.value),itemStyle:{color:'#7450ff',borderRadius:[0,8,8,0]}}]})}</script>
-<template><div class="page" v-loading="loading"><header class="page-head"><div><span class="eyebrow">ADMIN ANALYTICS</span><h1>数据看板</h1></div></header><div class="metric-grid"><article><span>知识库数</span><b>{{data.knowledgeBaseCount??0}}</b></article><article><span>文档数</span><b>{{data.documentCount??0}}</b></article><article><span>用户数</span><b>{{data.userCount??0}}</b></article><article><span>累计问答</span><b>{{data.questionCount??0}}</b></article></div><div class="chart-grid"><article class="chart-card wide-chart"><h3>近 7 日问答趋势</h3><div id="trend" class="chart"/></article><article class="chart-card"><h3>文件类型分布</h3><div id="types" class="chart"/></article><article class="chart-card"><h3>热门知识库 Top 5（按会话数）</h3><div id="popular" class="chart"/></article></div></div></template>
+<script setup lang="ts">import {nextTick, onMounted, ref} from 'vue';
+import * as echarts from 'echarts';
+import {adminApi} from '@/api';
+
+const data = ref<Record<string, any>>({}), loading = ref(true);
+onMounted(async () => {
+  try {
+    data.value = await adminApi.dashboard();
+    await nextTick();
+    render()
+  } finally {
+    loading.value = false
+  }
+});
+
+function chart(id: string, option: echarts.EChartsOption) {
+  const el = document.getElementById(id);
+  if (el) echarts.init(el).setOption(option)
+}
+
+function formatDate(value: unknown) {
+  return String(value ?? '').replace('T', ' ').replace(/\.\d{3}Z$/, '')
+}
+
+function render() {
+  const trend = data.value.questionTrend ?? [], types = data.value.fileTypes ?? [],
+      popular = data.value.popularKnowledgeBases ?? [];
+  chart('trend', {
+    tooltip: {},
+    xAxis: {type: 'category', data: trend.map((x: any) => formatDate(x.date))},
+    yAxis: {type: 'value'},
+    series: [{
+      type: 'line',
+      smooth: true,
+      data: trend.map((x: any) => x.value),
+      areaStyle: {color: 'rgba(116,80,255,.16)'},
+      lineStyle: {color: '#7450ff'}
+    }]
+  });
+  chart('types', {
+    tooltip: {trigger: 'item'},
+    series: [{
+      type: 'pie',
+      radius: ['52%', '75%'],
+      data: types,
+      itemStyle: {borderRadius: 8, borderWidth: 3, borderColor: '#fff'}
+    }]
+  });
+  chart('popular', {
+    tooltip: {},
+    xAxis: {type: 'value'},
+    yAxis: {type: 'category', data: popular.map((x: any) => x.name)},
+    series: [{
+      type: 'bar',
+      data: popular.map((x: any) => x.value),
+      itemStyle: {color: '#7450ff', borderRadius: [0, 8, 8, 0]}
+    }]
+  })
+}</script>
+<template>
+  <div class="page" v-loading="loading">
+    <header class="page-head">
+      <div><span class="eyebrow">ADMIN ANALYTICS</span>
+        <h1>数据看板</h1></div>
+    </header>
+    <div class="metric-grid">
+      <article><span>知识库数</span><b>{{ data.knowledgeBaseCount ?? 0 }}</b></article>
+      <article><span>文档数</span><b>{{ data.documentCount ?? 0 }}</b></article>
+      <article><span>用户数</span><b>{{ data.userCount ?? 0 }}</b></article>
+      <article><span>累计问答</span><b>{{ data.questionCount ?? 0 }}</b></article>
+    </div>
+    <div class="chart-grid">
+      <article class="chart-card wide-chart"><h3>近 7 日问答趋势</h3>
+        <div id="trend" class="chart"/>
+      </article>
+      <article class="chart-card"><h3>文件类型分布</h3>
+        <div id="types" class="chart"/>
+      </article>
+      <article class="chart-card"><h3>热门知识库 Top 5（按会话数）</h3>
+        <div id="popular" class="chart"/>
+      </article>
+    </div>
+  </div>
+</template>

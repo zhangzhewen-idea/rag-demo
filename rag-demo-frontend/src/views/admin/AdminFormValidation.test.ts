@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+import {flushPromises, mount} from '@vue/test-utils'
+import {nextTick} from 'vue'
 import ElementPlus from 'element-plus'
 import KnowledgeAdminView from './KnowledgeAdminView.vue'
 import UsersView from './UsersView.vue'
@@ -15,12 +15,17 @@ const adminApi = vi.hoisted(() => ({
   resetPassword: vi.fn(),
 }))
 
-vi.mock('@/api', () => ({ adminApi }))
+vi.mock('@/api', () => ({adminApi}))
 
 class ResizeObserverStub {
-  observe() { }
-  unobserve() { }
-  disconnect() { }
+  observe() {
+  }
+
+  unobserve() {
+  }
+
+  disconnect() {
+  }
 }
 
 function clickButton(label: string) {
@@ -48,7 +53,7 @@ describe('管理员表单校验', () => {
   it('知识库名称为空时显示提示且不发送请求', async () => {
     const wrapper = mount(KnowledgeAdminView, {
       attachTo: document.body,
-      global: { plugins: [ElementPlus], mocks: { $router: { push: vi.fn() } } },
+      global: {plugins: [ElementPlus], mocks: {$router: {push: vi.fn()}}},
     })
     await flushPromises()
 
@@ -67,7 +72,7 @@ describe('管理员表单校验', () => {
   // Found by /qa on 2026-07-20
   // Report: .gstack/qa-reports/qa-report-localhost-2026-07-20.md
   it('账号和昵称为空时显示提示且不发送请求', async () => {
-    const wrapper = mount(UsersView, { attachTo: document.body, global: { plugins: [ElementPlus] } })
+    const wrapper = mount(UsersView, {attachTo: document.body, global: {plugins: [ElementPlus]}})
     await flushPromises()
 
     clickButton('新增用户')

@@ -1,6 +1,7 @@
 # 项目命令
 
-所有命令默认从 `rag-demo` 仓库根目录执行。命令是当前项目认可的原始操作；是否必需由 `quality-gates.md` 按改动范围决定。
+所有命令默认从 `rag-demo` 仓库根目录执行。命令是当前项目认可的原始操作；是否必需由 `quality-gates.md`
+按改动范围决定。
 
 ## 通用检查
 
@@ -35,7 +36,8 @@ cd rag-demo-backend
 curl --fail --max-time 5 http://localhost:8080/actuator/health
 ```
 
-启动命令本身持续运行，不将其误报为卡死；检查完成后正常终止本地进程。启动可能连接 MySQL、Redis Stack 和百炼配置，执行前遵守安全边界。
+启动命令本身持续运行，不将其误报为卡死；检查完成后正常终止本地进程。启动可能连接 MySQL、Redis Stack
+和百炼配置，执行前遵守安全边界。
 
 ## 前端
 
@@ -68,7 +70,8 @@ npm run dev
 curl --fail --max-time 5 --head http://localhost:5173
 ```
 
-当前 `package.json` 没有 `lint` 脚本，不得虚构 `npm run lint` 门禁。`npm run build` 已包含 `vue-tsc -b`，但质量门禁仍单独运行 `npm run type-check`，使类型失败更清晰。
+当前 `package.json` 没有 `lint` 脚本，不得虚构 `npm run lint` 门禁。`npm run build` 已包含
+`vue-tsc -b`，但质量门禁仍单独运行 `npm run type-check`，使类型失败更清晰。
 
 ## 在线模型调用
 
