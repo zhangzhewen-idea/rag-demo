@@ -1,5 +1,6 @@
 package com.zhangzhewen.ragdemo.infrastructure.config;
 
+import com.zhangzhewen.ragdemo.infrastructure.redis.ChineseRedisIndexInitializer;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.redis.RedisVectorStore;
 import org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreProperties;
@@ -17,20 +18,38 @@ import redis.clients.jedis.RedisClient;
 public class RedisVectorConfig {
 
   /**
-   * 创建带 6 个业务元数据字段的 HNSW/COSINE 向量存储。
+   * 创建与 Spring Data Redis 共用连接信息的 Jedis 客户端。
    */
-  @Bean
-  @Primary
-  RedisVectorStore redisVectorStore(EmbeddingModel embeddingModel, JedisConnectionFactory factory,
-      RedisVectorStoreProperties properties) {
+  @Bean(destroyMethod = "close")
+  RedisClient redisVectorClient(JedisConnectionFactory factory) {
     DefaultJedisClientConfig.Builder clientConfig = DefaultJedisClientConfig.builder()
         .ssl(factory.isUseSsl()).clientName(factory.getClientName())
         .timeoutMillis(factory.getTimeout());
     if (factory.getPassword() != null && !factory.getPassword().isBlank()) {
       clientConfig.password(factory.getPassword());
     }
-    RedisClient client = RedisClient.builder().hostAndPort(factory.getHostName(), factory.getPort())
+    return RedisClient.builder().hostAndPort(factory.getHostName(), factory.getPort())
         .clientConfig(clientConfig.build()).build();
+  }
+
+  /**
+   * 创建支持中文分词的 Redis Search 索引初始化器。
+   */
+  @Bean
+  ChineseRedisIndexInitializer redisIndexInitializer(RedisClient client,
+      RedisVectorStoreProperties properties, EmbeddingModel embeddingModel) {
+    return new ChineseRedisIndexInitializer(client, properties.getIndexName(),
+        properties.getPrefix(), embeddingModel.dimensions(), properties.getHnsw());
+  }
+
+  /**
+   * 创建带 6 个业务元数据字段的 HNSW/COSINE 向量存储。
+   */
+  @Bean
+  @Primary
+  RedisVectorStore redisVectorStore(EmbeddingModel embeddingModel, RedisClient client,
+      RedisVectorStoreProperties properties, ChineseRedisIndexInitializer indexInitializer) {
+    indexInitializer.initialize();
     return RedisVectorStore.builder(client, embeddingModel)
         .indexName(properties.getIndexName()).prefix(properties.getPrefix())
         .vectorAlgorithm(RedisVectorStore.Algorithm.HNSW)
@@ -43,6 +62,6 @@ public class RedisVectorConfig {
             RedisVectorStore.MetadataField.numeric("pageNumber"),
             RedisVectorStore.MetadataField.text("sectionTitle"),
             RedisVectorStore.MetadataField.text("sourceName"))
-        .initializeSchema(properties.isInitializeSchema()).build();
+        .initializeSchema(false).build();
   }
 }

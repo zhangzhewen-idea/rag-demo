@@ -28,8 +28,8 @@ spring:
           dimensions: 2560
     vectorstore:
       redis:
-        initialize-schema: ${RAG_VECTOR_INITIALIZE_SCHEMA:true}
-        index-name: rag-demo-index
+        initialize-schema: false
+        index-name: rag-demo-index-v2
         prefix: "rag:chunk:"
   flyway:
     enabled: true
