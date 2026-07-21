@@ -22,6 +22,7 @@ spring:
       chat:
         options:
           model: qwen3.7-plus
+          temperature: 0.0
       embedding:
         options:
           model: qwen3.7-text-embedding

@@ -2,7 +2,6 @@ package com.zhangzhewen.ragdemo.infrastructure.config;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.rag.preretrieval.query.transformation.QueryTransformer;
 import org.springframework.ai.rag.preretrieval.query.transformation.RewriteQueryTransformer;
@@ -16,12 +15,11 @@ import org.springframework.context.annotation.Configuration;
 public class QueryRewriteConfig {
 
   /**
-   * 使用低随机性的独立客户端构建查询改写器。
+   * 使用全局模型配置构建查询改写器。
    */
   @Bean
   public QueryTransformer queryTransformer(ChatModel model) {
-    ChatClient.Builder builder = ChatClient.builder(model)
-        .defaultOptions(ChatOptions.builder().temperature(0.0));
+    ChatClient.Builder builder = ChatClient.builder(model);
     PromptTemplate prompt = new PromptTemplate("""
         你是专业的企业知识库查询改写助手。请将原始查询改写为更适合在{target}中检索的查询。
 
