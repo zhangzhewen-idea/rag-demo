@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, type InputInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { conversationApi } from '@/api'
 import { streamChat } from '@/api/sse'
@@ -17,6 +17,7 @@ const generating = ref(false)
 const references = ref<Reference[]>([])
 const drawer = ref(false)
 const controller = ref<AbortController>()
+const questionInput = ref<InputInstance>()
 
 onMounted(load)
 
@@ -24,6 +25,8 @@ async function load() {
   const data = await conversationApi.detail(id)
   conversation.value = data.conversation
   messages.value = data.messages
+  await nextTick()
+  questionInput.value?.focus()
 }
 
 async function send() {
@@ -109,7 +112,7 @@ async function copy(text: string) {
     </section>
     <footer class="composer">
       <div class="input-wrap">
-        <el-input v-model="question" type="textarea" :rows="2" resize="none" placeholder="输入问题，Enter 发送，Shift+Enter 换行" @keydown.enter.exact.prevent="send" />
+        <el-input ref="questionInput" v-model="question" type="textarea" :rows="2" resize="none" placeholder="输入问题，Enter 发送，Shift+Enter 换行" @keydown.enter.exact.prevent="send" />
         <el-button v-if="generating" class="send" @click="stop">停止</el-button>
         <el-button v-else type="primary" class="send" :disabled="!question.trim()" @click="send">发送</el-button>
       </div>
