@@ -1,0 +1,36 @@
+# 版本控制与 IDE 元数据
+.git/
+.codegraph/
+**/.idea/
+.DS_Store
+
+# 依赖与工具缓存
+**/node_modules/
+**/.vite/
+**/.cache/
+.superpowers/
+.gstack/
+
+# 前后端构建与测试产物
+**/dist/
+**/coverage/
+**/target/
+**/*.class
+**/*.jar
+**/*.tsbuildinfo
+
+# 运行时生成数据
+**/log/
+**/logs/
+**/*.log
+data/
+**/uploads/
+
+# 本地敏感配置
+.env
+.env.*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.jks

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(/.git/**)",
+      "Read(/.codegraph/**)",
+      "Read(/**/.idea/**)",
+      "Read(/**/.DS_Store)",
+      "Read(/.superpowers/**)",
+      "Read(/.gstack/**)",
+      "Read(/**/node_modules/**)",
+      "Read(/**/.vite/**)",
+      "Read(/**/.cache/**)",
+      "Read(/**/target/**)",
+      "Read(/**/dist/**)",
+      "Read(/**/coverage/**)",
+      "Read(/**/*.class)",
+      "Read(/**/*.jar)",
+      "Read(/**/*.tsbuildinfo)",
+      "Read(/data/**)",
+      "Read(/**/uploads/**)",
+      "Read(/**/log/**)",
+      "Read(/**/logs/**)",
+      "Read(/**/*.log)",
+      "Read(/.env)",
+      "Read(/.env.*)",
+      "Read(/**/*.key)",
+      "Read(/**/*.pem)",
+      "Read(/**/*.p12)",
+      "Read(/**/*.pfx)",
+      "Read(/**/*.jks)"
+    ]
+  }
+}
