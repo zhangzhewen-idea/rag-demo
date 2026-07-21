@@ -67,6 +67,22 @@ class ConversationServiceTest {
     verify(fixture.vectors, never()).searchDocument(1L, 8L, "失败文档.txt 主要内容 核心要点 完整概览", 3, .6);
   }
 
+  /** “你知道哪些”同样属于知识库概览，不能退回普通全库 TopK。 */
+  @Test
+  void recognizesNaturalOverviewQuestionVariants() {
+    Fixture fixture = new Fixture();
+    KnowledgeDocument api = document(6L, "API接口设计规范.md", DocumentStatus.READY);
+    when(fixture.documents.listByKnowledgeBase(1L)).thenReturn(List.of(api));
+    RetrievedChunk apiChunk = chunk(6L, "API接口设计规范.md");
+    when(fixture.vectors.searchDocument(1L, 6L, "API接口设计规范.md 主要内容 核心要点 完整概览", 3, .6))
+        .thenReturn(List.of(apiChunk));
+
+    var result = fixture.service.chat(9L, 2L, "你知道哪些？", ignored -> { }).join();
+
+    assertThat(result.references()).containsExactly(apiChunk);
+    verify(fixture.vectors, never()).search(anyLong(), anyString(), anyInt(), anyDouble());
+  }
+
   private static KnowledgeDocument document(Long id, String name, DocumentStatus status) {
     return new KnowledgeDocument(id, 1L, name, name, "/tmp/" + name, "txt", "text/plain",
         100, "hash", status, 2, 0, null, null);

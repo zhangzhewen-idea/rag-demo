@@ -159,7 +159,10 @@ public class ConversationService {
 
   private boolean isOverviewQuestion(String question) {
     String normalized = normalize(question);
-    return normalized.equals("你知道什么") || normalized.equals("知识库有什么")
+    boolean asksCapability = normalized.matches(
+        "^(你)?(都)?(知道|了解|掌握)(些)?(什么|哪些|多少)(内容|知识|信息|资料)?$")
+        || normalized.matches("^(你)?能(回答|介绍)(些)?(什么|哪些)(内容|知识|信息|资料)?$");
+    return asksCapability || normalized.equals("知识库有什么")
         || normalized.contains("有哪些内容") || normalized.contains("全部内容")
         || normalized.contains("所有内容") || normalized.contains("完整概览")
         || normalized.contains("全面介绍") || normalized.contains("概括知识库");
