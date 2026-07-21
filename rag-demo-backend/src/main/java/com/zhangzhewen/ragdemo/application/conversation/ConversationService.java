@@ -9,6 +9,7 @@ import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.QueryRewriteGateway;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
@@ -27,17 +28,20 @@ public class ConversationService {
   private final DocumentSearchGateway search;
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
+  private final QueryRewriteGateway queryRewrite;
   private final RetrievalPolicy policy;
 
   /**
    * 注入用例依赖。
    */
   public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
-      AiGateway ai, KnowledgeGateway knowledge, RetrievalPolicy policy) {
+      AiGateway ai, KnowledgeGateway knowledge, QueryRewriteGateway queryRewrite,
+      RetrievalPolicy policy) {
     this.conversations = conversations;
     this.search = search;
     this.ai = ai;
     this.knowledge = knowledge;
+    this.queryRewrite = queryRewrite;
     this.policy = policy;
   }
 
@@ -115,7 +119,8 @@ public class ConversationService {
 
   private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
       List<Message> history) {
-    return search.search(knowledgeBaseId, contextualQuery(question, history), policy.topK(),
+    String rewritten = queryRewrite.rewrite(contextualQuery(question, history));
+    return search.search(knowledgeBaseId, rewritten, policy.topK(),
         policy.similarityThreshold());
   }
 

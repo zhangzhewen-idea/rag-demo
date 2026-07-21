@@ -35,6 +35,7 @@ class HybridDocumentSearchGatewayTest {
     List<RetrievedChunk> result = gateway.search(9L, "ModelArts平台", 10, .7);
 
     assertThat(result).extracting(RetrievedChunk::documentId).containsExactly(1L, 2L);
+    verify(vectors).search(9L, "ModelArts平台", 10, .7);
     verify(store).searchByText("ModelArts平台", "content", 10, "@knowledgeBaseId:{9}");
   }
 
