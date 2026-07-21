@@ -7,9 +7,9 @@ import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
-import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
 import com.zhangzhewen.ragdemo.domain.knowledge.DocumentStatus;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeDocument;
 import java.util.ArrayList;
@@ -28,7 +28,7 @@ public class ConversationService {
 
   public static final String NO_EVIDENCE = "当前知识库中未找到可靠依据";
   private final ConversationGateway conversations;
-  private final VectorGateway vectors;
+  private final DocumentSearchGateway search;
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
   private final DocumentGateway documents;
@@ -37,10 +37,10 @@ public class ConversationService {
   /**
    * 注入用例依赖。
    */
-  public ConversationService(ConversationGateway conversations, VectorGateway vectors, AiGateway ai,
-      KnowledgeGateway knowledge, DocumentGateway documents, RetrievalPolicy policy) {
+  public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
+      AiGateway ai, KnowledgeGateway knowledge, DocumentGateway documents, RetrievalPolicy policy) {
     this.conversations = conversations;
-    this.vectors = vectors;
+    this.search = search;
     this.ai = ai;
     this.knowledge = knowledge;
     this.documents = documents;
@@ -123,7 +123,7 @@ public class ConversationService {
   private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
       List<Message> history, boolean overview) {
     if (!overview) {
-      return vectors.search(knowledgeBaseId, contextualQuery(question, history), policy.topK(),
+      return search.search(knowledgeBaseId, contextualQuery(question, history), policy.topK(),
           policy.similarityThreshold());
     }
     int perDocumentTopK = Math.max(2, Math.min(4, policy.topK() / 2));
@@ -133,7 +133,7 @@ public class ConversationService {
         continue;
       }
       String query = document.originalName() + " 主要内容 核心要点 完整概览";
-      result.addAll(vectors.searchDocument(knowledgeBaseId, document.id(), query, perDocumentTopK,
+      result.addAll(search.searchDocument(knowledgeBaseId, document.id(), query, perDocumentTopK,
           policy.similarityThreshold()));
     }
     return result;
@@ -179,19 +179,19 @@ public class ConversationService {
   private Conversation requireOwned(Long id, Long userId) {
     Conversation c = conversations.findConversationById(id).orElseThrow(
         () -> new BusinessException("CONVERSATION_NOT_FOUND", "会话不存在", HttpStatus.NOT_FOUND));
-      if (!c.ownedBy(userId)) {
-          throw new BusinessException("CONVERSATION_FORBIDDEN", "不能访问其他用户的会话",
-              HttpStatus.FORBIDDEN);
-      }
+    if (!c.ownedBy(userId)) {
+      throw new BusinessException("CONVERSATION_FORBIDDEN", "不能访问其他用户的会话",
+          HttpStatus.FORBIDDEN);
+    }
     return c;
   }
 
   private void requireSearchable(Long id) {
     var kb = knowledge.findKnowledgeById(id).orElseThrow(
         () -> new BusinessException("KB_NOT_FOUND", "知识库不存在", HttpStatus.NOT_FOUND));
-      if (!kb.searchable()) {
-          throw new BusinessException("KB_DISABLED", "知识库已停用", HttpStatus.CONFLICT);
-      }
+    if (!kb.searchable()) {
+      throw new BusinessException("KB_DISABLED", "知识库已停用", HttpStatus.CONFLICT);
+    }
   }
 
   /**

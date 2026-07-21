@@ -253,9 +253,10 @@ READY/FAILED -> DELETING -> 逻辑删除
 ### 8.2 检索
 
 - 先校验会话归属和知识库启用状态。
-- 通过 `knowledgeBaseId` 精确过滤 Redis Vector Store。
-- 默认 `Top-K = 6`，相似度阈值为 `0.75`，两者均通过配置文件暴露；阈值可使用 `RAG_SIMILARITY_THRESHOLD`
-  按评测结果调整。
+- 在同一个 Redis 索引上分别执行 BM25 关键词检索和向量语义检索，通过 Reciprocal Rank Fusion 融合并去重。
+- 两路检索均通过 `knowledgeBaseId` 精确过滤；按文档概览时同时通过 `documentId` 过滤。
+- 默认 `Top-K = 6`，向量相似度阈值为 `0.2`，两者均通过配置文件暴露；可使用 `RAG_TOP_K` 和
+  `RAG_SIMILARITY_THRESHOLD` 按评测结果调整。
 - 应用层显式调用检索 Gateway 并保留命中的 Spring AI `Document`，不把检索结果完全隐藏在 Advisor
   内，以便生成和保存引用。
 
