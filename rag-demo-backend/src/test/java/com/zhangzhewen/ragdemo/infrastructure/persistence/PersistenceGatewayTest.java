@@ -17,4 +17,13 @@ class PersistenceGatewayTest {
     String sql = PersistenceGateway.userQuery("WHERE u.deleted=0");
     assertThat(sql).contains("GROUP BY u.id").doesNotContain("ORDER BY u.id GROUP BY");
   }
+
+  /**
+   * 引用入库同时保留初始相似度与可空重排分数。
+   */
+  @Test
+  void insertsBothRetrievalScores() {
+    assertThat(PersistenceGateway.REFERENCE_INSERT).contains(
+        "similarity_score,rerank_score,excerpt").contains("VALUES(?,?,?,?,?,?,?,?,?,?)");
+  }
 }

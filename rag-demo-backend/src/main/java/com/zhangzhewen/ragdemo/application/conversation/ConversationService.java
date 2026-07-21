@@ -7,6 +7,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.DocumentRerankGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.QueryRewriteGateway;
@@ -26,6 +27,7 @@ public class ConversationService {
   public static final String NO_EVIDENCE = "当前知识库中未找到可靠依据";
   private final ConversationGateway conversations;
   private final DocumentSearchGateway search;
+  private final DocumentRerankGateway rerank;
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
   private final QueryRewriteGateway queryRewrite;
@@ -35,10 +37,11 @@ public class ConversationService {
    * 注入用例依赖。
    */
   public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
-      AiGateway ai, KnowledgeGateway knowledge, QueryRewriteGateway queryRewrite,
-      RetrievalPolicy policy) {
+      DocumentRerankGateway rerank, AiGateway ai, KnowledgeGateway knowledge,
+      QueryRewriteGateway queryRewrite, RetrievalPolicy policy) {
     this.conversations = conversations;
     this.search = search;
+    this.rerank = rerank;
     this.ai = ai;
     this.knowledge = knowledge;
     this.queryRewrite = queryRewrite;
@@ -120,8 +123,12 @@ public class ConversationService {
   private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
       List<Message> history) {
     String rewritten = queryRewrite.rewrite(contextualQuery(question, history));
-    return search.search(knowledgeBaseId, rewritten, policy.topK(),
-        policy.similarityThreshold());
+    List<RetrievedChunk> candidates = search.search(knowledgeBaseId, rewritten,
+        policy.candidateTopK(), policy.similarityThreshold());
+    if (candidates.isEmpty()) {
+      return candidates;
+    }
+    return rerank.rerank(rewritten, candidates, policy.topK());
   }
 
   private String contextualQuery(String question, List<Message> history) {

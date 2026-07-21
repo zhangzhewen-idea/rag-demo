@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,8 +23,9 @@ public class SpringAiGateway implements AiGateway {
   /**
    * 从 Spring AI ChatModel 构建客户端。
    */
-  public SpringAiGateway(ChatModel model) {
-    this.client = ChatClient.builder(model).build();
+  public SpringAiGateway(ChatModel model,
+      @Qualifier("aiInteractionLoggingAdvisor") Advisor loggingAdvisor) {
+    this.client = ChatClient.builder(model).defaultAdvisors(loggingAdvisor).build();
   }
 
   /**

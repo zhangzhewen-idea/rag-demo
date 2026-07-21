@@ -17,6 +17,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.DocumentRerankGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.QueryRewriteGateway;
@@ -39,7 +40,7 @@ class ConversationServiceTest {
   @Test
   void refusesWithoutEvidence() {
     Fixture fixture = new Fixture();
-    when(fixture.search.search(1L, "问题", 6, .6)).thenReturn(List.of());
+    when(fixture.search.search(1L, "问题", 20, .6)).thenReturn(List.of());
 
     StringBuilder stream = new StringBuilder();
     var result = fixture.service.chat(9L, 2L, "问题", stream::append).join();
@@ -47,6 +48,7 @@ class ConversationServiceTest {
     assertThat(stream.toString()).isEqualTo(ConversationService.NO_EVIDENCE);
     assertThat(result.references()).isEmpty();
     verifyNoInteractions(fixture.ai);
+    verifyNoInteractions(fixture.rerank);
   }
 
   /**
@@ -57,10 +59,16 @@ class ConversationServiceTest {
     Fixture fixture = new Fixture();
     String question = "苹果股价咋样了？";
     String rewritten = "Apple Inc.（AAPL）股价表现与财务分析";
-    List<RetrievedChunk> evidence = List.of(
-        new RetrievedChunk(1L, 3L, "Apple 分析", 0, .9, "股价分析", null, null));
+    RetrievedChunk first =
+        new RetrievedChunk(1L, 3L, "Apple 分析", 0, .9, "股价分析", null, null);
+    RetrievedChunk second =
+        new RetrievedChunk(1L, 4L, "Apple 财报", 0, .8, "财报内容", null, null);
+    List<RetrievedChunk> candidates = List.of(first, second);
+    List<RetrievedChunk> evidence = List.of(second.withRerankScore(.95),
+        first.withRerankScore(.7));
     when(fixture.queryRewrite.rewrite(question)).thenReturn(rewritten);
-    when(fixture.search.search(1L, rewritten, 6, .6)).thenReturn(evidence);
+    when(fixture.search.search(1L, rewritten, 20, .6)).thenReturn(candidates);
+    when(fixture.rerank.rerank(rewritten, candidates, 6)).thenReturn(evidence);
     doAnswer(invocation -> {
       Consumer<String> delta = invocation.getArgument(3);
       delta.accept("回答");
@@ -72,7 +80,8 @@ class ConversationServiceTest {
 
     assertThat(stream.toString()).isEqualTo("回答");
     assertThat(result.references()).isEqualTo(evidence);
-    verify(fixture.search).search(1L, rewritten, 6, .6);
+    verify(fixture.search).search(1L, rewritten, 20, .6);
+    verify(fixture.rerank).rerank(rewritten, candidates, 6);
     verify(fixture.ai).streamAnswer(eq(question), eq(List.of()), eq(evidence), any());
     verify(fixture.conversations).saveMessage(9L, "USER", question, "COMPLETED", null, null,
         null);
@@ -89,25 +98,26 @@ class ConversationServiceTest {
     when(fixture.conversations.recentMessages(9L, 20)).thenReturn(List.of(previous));
     String contextual = previous.content() + "\n追问：它的股价表现呢？";
     when(fixture.queryRewrite.rewrite(contextual)).thenReturn("Apple Inc. 2024 年 Q2 股价表现");
-    when(fixture.search.search(1L, "Apple Inc. 2024 年 Q2 股价表现", 6, .6))
+    when(fixture.search.search(1L, "Apple Inc. 2024 年 Q2 股价表现", 20, .6))
         .thenReturn(List.of());
 
     fixture.service.chat(9L, 2L, "它的股价表现呢？", ignored -> {
     }).join();
 
     verify(fixture.queryRewrite).rewrite(contextual);
-    verify(fixture.search).search(1L, "Apple Inc. 2024 年 Q2 股价表现", 6, .6);
+    verify(fixture.search).search(1L, "Apple Inc. 2024 年 Q2 股价表现", 20, .6);
   }
 
   private static final class Fixture {
 
     private final ConversationGateway conversations = mock(ConversationGateway.class);
     private final DocumentSearchGateway search = mock(DocumentSearchGateway.class);
+    private final DocumentRerankGateway rerank = mock(DocumentRerankGateway.class);
     private final AiGateway ai = mock(AiGateway.class);
     private final KnowledgeGateway knowledge = mock(KnowledgeGateway.class);
     private final QueryRewriteGateway queryRewrite = mock(QueryRewriteGateway.class);
-    private final ConversationService service = new ConversationService(conversations, search, ai,
-        knowledge, queryRewrite, new RetrievalPolicy(6, .6));
+    private final ConversationService service = new ConversationService(conversations, search,
+        rerank, ai, knowledge, queryRewrite, new RetrievalPolicy(6, 20, .6));
 
     private Fixture() {
       when(conversations.findConversationById(9L))

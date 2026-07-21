@@ -40,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class PersistenceGateway implements UserGateway, KnowledgeGateway, ConversationGateway,
     DocumentGateway, DashboardGateway {
 
+  static final String REFERENCE_INSERT =
+      "INSERT INTO ai_message_reference(message_id,knowledge_base_id,document_id,source_name,chunk_index,similarity_score,rerank_score,excerpt,page_number,section_title) VALUES(?,?,?,?,?,?,?,?,?,?)";
   private final JdbcTemplate jdbc;
   private final SystemMetricsMapper metrics;
 
@@ -230,10 +232,9 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
 
   @Override
   public void saveReferences(Long messageId, List<RetrievedChunk> references) {
-    references.forEach(r -> jdbc.update(
-        "INSERT INTO ai_message_reference(message_id,knowledge_base_id,document_id,source_name,chunk_index,similarity_score,excerpt,page_number,section_title) VALUES(?,?,?,?,?,?,?,?,?)",
+    references.forEach(r -> jdbc.update(REFERENCE_INSERT,
         messageId, r.knowledgeBaseId(), r.documentId(), r.sourceName(), r.chunkIndex(),
-        r.similarityScore(), r.excerpt(), r.pageNumber(), r.sectionTitle()));
+        r.similarityScore(), r.rerankScore(), r.excerpt(), r.pageNumber(), r.sectionTitle()));
   }
 
   private static final RowMapper<KnowledgeDocument> DOCUMENT_MAPPER = (rs, n) -> new KnowledgeDocument(

@@ -17,11 +17,11 @@ spring:
       max-request-size: 21MB
   ai:
     openai:
-      api-key: ${OPENAPI_KEY:local-placeholder}
+      api-key: ${DASHSCOPE_API_KEY:${OPENAPI_KEY:local-placeholder}}
       base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
       chat:
         options:
-          model: qwen3.7-plus
+          model: deepseek-v4-flash
           temperature: 0.0
       embedding:
         options:
@@ -56,7 +56,14 @@ rag:
     refresh-ttl: 7d
   retrieval:
     top-k: ${RAG_TOP_K:6}
+    candidate-top-k: ${RAG_CANDIDATE_TOP_K:20}
     similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.2}
+  reranking:
+    enabled: ${RAG_RERANK_ENABLED:true}
+    model: ${RAG_RERANK_MODEL:qwen3-rerank}
+    base-url: ${DASHSCOPE_RERANK_BASE_URL:https://dashscope.aliyuncs.com/compatible-api/v1/reranks}
+    api-key: ${DASHSCOPE_API_KEY:${OPENAPI_KEY:local-placeholder}}
+    timeout: ${RAG_RERANK_TIMEOUT:5s}
   ingestion:
     chunk-size: 800
     chunk-overlap: 100
@@ -69,6 +76,8 @@ management:
         include: health,info
 
 logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: ${AI_INTERACTION_LOG_LEVEL:DEBUG}
   pattern:
     level: "%5p [requestId:%X{requestId:-}]"
   file:
