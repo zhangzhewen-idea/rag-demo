@@ -1,14 +1,15 @@
 package com.zhangzhewen.ragdemo.domain.gateway;
 
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import java.util.List;
 
 /**
- * 面向复杂知识库问题的多查询扩展边界。
+ * 面向复杂知识库问题的多路检索计划边界。
  */
 public interface QueryExpansionGateway {
 
   /**
-   * 将独立查询扩展为多个互补的检索查询。
+   * 一次生成多组互补的语义查询和关键词查询。
    */
-  List<String> expand(String query);
+  List<RetrievalQuery> plan(String query);
 }

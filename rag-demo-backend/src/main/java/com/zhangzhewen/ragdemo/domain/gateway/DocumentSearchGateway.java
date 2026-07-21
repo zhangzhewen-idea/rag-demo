@@ -1,5 +1,6 @@
 package com.zhangzhewen.ragdemo.domain.gateway;
 
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import java.util.List;
 
@@ -11,11 +12,12 @@ public interface DocumentSearchGateway {
   /**
    * 在指定知识库内检索证据。
    */
-  List<RetrievedChunk> search(Long knowledgeBaseId, String query, int topK, double threshold);
+  List<RetrievedChunk> search(Long knowledgeBaseId, RetrievalQuery query, int topK,
+      double threshold);
 
   /**
    * 在指定知识库的单个文档内检索证据。
    */
-  List<RetrievedChunk> searchDocument(Long knowledgeBaseId, Long documentId, String query,
+  List<RetrievedChunk> searchDocument(Long knowledgeBaseId, Long documentId, RetrievalQuery query,
       int topK, double threshold);
 }

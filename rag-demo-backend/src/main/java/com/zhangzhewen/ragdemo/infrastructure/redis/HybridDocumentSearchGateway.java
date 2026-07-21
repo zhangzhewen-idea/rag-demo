@@ -1,6 +1,7 @@
 package com.zhangzhewen.ragdemo.infrastructure.redis;
 
 import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
@@ -29,21 +30,22 @@ public class HybridDocumentSearchGateway implements DocumentSearchGateway {
   }
 
   @Override
-  public List<RetrievedChunk> search(Long knowledgeBaseId, String query, int topK,
+  public List<RetrievedChunk> search(Long knowledgeBaseId, RetrievalQuery query, int topK,
       double threshold) {
-    List<RetrievedChunk> semantic = vectors.search(knowledgeBaseId, query, topK, threshold);
-    List<RetrievedChunk> keyword = keywordSearch(query, topK,
+    List<RetrievedChunk> semantic = vectors.search(knowledgeBaseId, query.semanticQuery(), topK,
+        threshold);
+    List<RetrievedChunk> keyword = keywordSearch(query.keywordQuery(), topK,
         "@knowledgeBaseId:{" + knowledgeBaseId + "}");
     return ReciprocalRankFusion.fuse(List.of(semantic, keyword), topK);
   }
 
   @Override
-  public List<RetrievedChunk> searchDocument(Long knowledgeBaseId, Long documentId, String query,
-      int topK, double threshold) {
-    List<RetrievedChunk> semantic = vectors.searchDocument(knowledgeBaseId, documentId, query, topK,
-        threshold);
+  public List<RetrievedChunk> searchDocument(Long knowledgeBaseId, Long documentId,
+      RetrievalQuery query, int topK, double threshold) {
+    List<RetrievedChunk> semantic = vectors.searchDocument(knowledgeBaseId, documentId,
+        query.semanticQuery(), topK, threshold);
     String filter = "@knowledgeBaseId:{" + knowledgeBaseId + "} @documentId:{" + documentId + "}";
-    List<RetrievedChunk> keyword = keywordSearch(query, topK, filter);
+    List<RetrievedChunk> keyword = keywordSearch(query.keywordQuery(), topK, filter);
     return ReciprocalRankFusion.fuse(List.of(semantic, keyword), topK);
   }
 

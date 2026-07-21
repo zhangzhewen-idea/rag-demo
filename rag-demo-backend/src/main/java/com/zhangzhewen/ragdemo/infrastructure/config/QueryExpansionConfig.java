@@ -1,47 +1,53 @@
 package com.zhangzhewen.ragdemo.infrastructure.config;
 
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
+import com.zhangzhewen.ragdemo.infrastructure.ai.SpringAiQueryExpansionGateway.QueryPlanner;
+import java.util.List;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.ai.rag.preretrieval.query.expansion.MultiQueryExpander;
-import org.springframework.ai.rag.preretrieval.query.expansion.QueryExpander;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 复杂问题的多查询扩展配置。
+ * 复杂问题的多路检索规划配置。
  */
 @Configuration
 public class QueryExpansionConfig {
 
+  private static final int NUMBER_OF_PLANS = 4;
+  private static final ParameterizedTypeReference<List<RetrievalQuery>> PLAN_TYPE =
+      new ParameterizedTypeReference<>() {
+      };
+
   /**
-   * 保留改写后的原查询，并生成三个不同角度的子查询。
+   * 一次模型调用生成四组结构化语义查询和关键词查询。
    */
   @Bean
-  public QueryExpander queryExpander(ChatModel model,
+  public QueryPlanner queryPlanner(ChatModel model,
       @Qualifier("aiInteractionLoggingAdvisor") Advisor loggingAdvisor) {
-    ChatClient.Builder builder = ChatClient.builder(model).defaultAdvisors(loggingAdvisor);
-    PromptTemplate prompt = new PromptTemplate("""
-        你是专业的企业知识库检索助手。请将给定查询扩展为{number}个互补的子查询。
+    ChatClient client = ChatClient.builder(model).defaultAdvisors(loggingAdvisor).build();
+    String prompt = """
+        你是专业的企业知识库检索规划助手。请为给定查询生成{number}组互补的检索计划。
 
-        扩展原则：
-        1. 每个子查询聚焦一个独立实体、比较维度或推理步骤。
-        2. 保留原查询中的产品名、时间、范围和其他限定条件。
-        3. 不得添加原查询未包含的事实，也不得回答问题。
-        4. 每行只输出一个子查询，不要编号、标签、解释或空行。
+        每组计划包含：
+        - semanticQuery：用于向量检索的完整自然语言查询，表达清晰且可独立理解。
+        - keywordQuery：用于 BM25 的精简关键词，使用空格分隔，保留产品名、专有名词、缩写、时间和关键限定词。
+
+        规划原则：
+        1. 第一组覆盖原查询的完整意图，其余各组聚焦独立实体、比较维度或推理步骤。
+        2. keywordQuery 删除“如何、什么、区别”等低信息疑问词，避免只保留“平台、功能”等泛词。
+        3. 不得添加原查询未包含的事实，不得回答问题。
+        4. 严格按照结构化输出约束返回，不要添加解释。
 
         查询：
         {query}
-
-        子查询：
-        """);
-    return MultiQueryExpander.builder()
-        .chatClientBuilder(builder)
-        .promptTemplate(prompt)
-        .numberOfQueries(3)
-        .includeOriginal(true)
-        .build();
+        """;
+    return query -> client.prompt()
+        .user(user -> user.text(prompt).param("number", NUMBER_OF_PLANS).param("query", query))
+        .call()
+        .entity(PLAN_TYPE);
   }
 }

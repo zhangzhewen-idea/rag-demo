@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
 import java.util.List;
@@ -28,15 +29,16 @@ class HybridDocumentSearchGatewayTest {
     HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store);
     RetrievedChunk semantic = chunk(1L, .8, "语义内容");
     Document keyword = document(2L, "包含 ModelArts 的内容");
-    when(vectors.search(9L, "ModelArts平台", 10, .7)).thenReturn(List.of(semantic));
-    when(store.searchByText("ModelArts平台", "content", 10, "@knowledgeBaseId:{9}"))
+    RetrievalQuery query = new RetrievalQuery("ModelArts 平台能力", "华为云 ModelArts");
+    when(vectors.search(9L, query.semanticQuery(), 10, .7)).thenReturn(List.of(semantic));
+    when(store.searchByText(query.keywordQuery(), "content", 10, "@knowledgeBaseId:{9}"))
         .thenReturn(List.of(keyword));
 
-    List<RetrievedChunk> result = gateway.search(9L, "ModelArts平台", 10, .7);
+    List<RetrievedChunk> result = gateway.search(9L, query, 10, .7);
 
     assertThat(result).extracting(RetrievedChunk::documentId).containsExactly(1L, 2L);
-    verify(vectors).search(9L, "ModelArts平台", 10, .7);
-    verify(store).searchByText("ModelArts平台", "content", 10, "@knowledgeBaseId:{9}");
+    verify(vectors).search(9L, query.semanticQuery(), 10, .7);
+    verify(store).searchByText(query.keywordQuery(), "content", 10, "@knowledgeBaseId:{9}");
   }
 
   /**
@@ -47,14 +49,15 @@ class HybridDocumentSearchGatewayTest {
     VectorGateway vectors = mock(VectorGateway.class);
     RedisVectorStore store = mock(RedisVectorStore.class);
     HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store);
-    when(vectors.searchDocument(9L, 2L, "概览", 3, .6)).thenReturn(List.of());
-    when(store.searchByText("概览", "content", 3,
+    RetrievalQuery query = new RetrievalQuery("文档内容概览", "内容 概览");
+    when(vectors.searchDocument(9L, 2L, query.semanticQuery(), 3, .6)).thenReturn(List.of());
+    when(store.searchByText(query.keywordQuery(), "content", 3,
         "@knowledgeBaseId:{9} @documentId:{2}")).thenReturn(List.of(document(2L, "内容")));
 
-    List<RetrievedChunk> result = gateway.searchDocument(9L, 2L, "概览", 3, .6);
+    List<RetrievedChunk> result = gateway.searchDocument(9L, 2L, query, 3, .6);
 
     assertThat(result).extracting(RetrievedChunk::documentId).containsExactly(2L);
-    verify(store).searchByText("概览", "content", 3,
+    verify(store).searchByText(query.keywordQuery(), "content", 3,
         "@knowledgeBaseId:{9} @documentId:{2}");
   }
 

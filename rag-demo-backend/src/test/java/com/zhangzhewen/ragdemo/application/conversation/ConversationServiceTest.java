@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
@@ -41,7 +42,8 @@ class ConversationServiceTest {
   @Test
   void refusesWithoutEvidence() {
     Fixture fixture = new Fixture();
-    when(fixture.search.search(1L, "问题", 20, .6)).thenReturn(List.of());
+    RetrievalQuery plan = new RetrievalQuery("问题", "问题");
+    when(fixture.search.search(1L, plan, 20, .6)).thenReturn(List.of());
 
     StringBuilder stream = new StringBuilder();
     var result = fixture.service.chat(9L, 2L, "问题", stream::append).join();
@@ -67,9 +69,10 @@ class ConversationServiceTest {
     List<RetrievedChunk> candidates = List.of(first, second);
     List<RetrievedChunk> evidence = List.of(second.withRerankScore(.95),
         first.withRerankScore(.7));
+    RetrievalQuery plan = new RetrievalQuery(rewritten, "Apple AAPL 股价 财务");
     when(fixture.queryRewrite.rewrite(question)).thenReturn(rewritten);
-    when(fixture.queryExpansion.expand(rewritten)).thenReturn(List.of(rewritten));
-    when(fixture.search.search(1L, rewritten, 20, .6)).thenReturn(candidates);
+    when(fixture.queryExpansion.plan(rewritten)).thenReturn(List.of(plan));
+    when(fixture.search.search(1L, plan, 20, .6)).thenReturn(candidates);
     when(fixture.rerank.rerank(rewritten, candidates, 6)).thenReturn(evidence);
     doAnswer(invocation -> {
       Consumer<String> delta = invocation.getArgument(3);
@@ -82,7 +85,7 @@ class ConversationServiceTest {
 
     assertThat(stream.toString()).isEqualTo("回答");
     assertThat(result.references()).isEqualTo(evidence);
-    verify(fixture.search).search(1L, rewritten, 20, .6);
+    verify(fixture.search).search(1L, plan, 20, .6);
     verify(fixture.rerank).rerank(rewritten, candidates, 6);
     verify(fixture.ai).streamAnswer(eq(question), eq(List.of()), eq(evidence), any());
     verify(fixture.conversations).saveMessage(9L, "USER", question, "COMPLETED", null, null,
@@ -99,17 +102,17 @@ class ConversationServiceTest {
         "COMPLETED", null, null, null, LocalDateTime.now());
     when(fixture.conversations.recentMessages(9L, 20)).thenReturn(List.of(previous));
     String contextual = previous.content() + "\n追问：它的股价表现呢？";
-    when(fixture.queryRewrite.rewrite(contextual)).thenReturn("Apple Inc. 2024 年 Q2 股价表现");
-    when(fixture.queryExpansion.expand("Apple Inc. 2024 年 Q2 股价表现"))
-        .thenReturn(List.of("Apple Inc. 2024 年 Q2 股价表现"));
-    when(fixture.search.search(1L, "Apple Inc. 2024 年 Q2 股价表现", 20, .6))
-        .thenReturn(List.of());
+    String rewritten = "Apple Inc. 2024 年 Q2 股价表现";
+    RetrievalQuery plan = new RetrievalQuery(rewritten, "Apple 2024 Q2 股价");
+    when(fixture.queryRewrite.rewrite(contextual)).thenReturn(rewritten);
+    when(fixture.queryExpansion.plan(rewritten)).thenReturn(List.of(plan));
+    when(fixture.search.search(1L, plan, 20, .6)).thenReturn(List.of());
 
     fixture.service.chat(9L, 2L, "它的股价表现呢？", ignored -> {
     }).join();
 
     verify(fixture.queryRewrite).rewrite(contextual);
-    verify(fixture.search).search(1L, "Apple Inc. 2024 年 Q2 股价表现", 20, .6);
+    verify(fixture.search).search(1L, plan, 20, .6);
   }
 
   /**
@@ -120,8 +123,11 @@ class ConversationServiceTest {
     Fixture fixture = new Fixture();
     String question = "华为云 ModelArts 与阿里云 PAI 的区别";
     String rewritten = "华为云 ModelArts 平台与阿里云 PAI 平台对比";
-    String modelArtsQuery = "华为云 ModelArts 平台功能与特点";
-    String paiQuery = "阿里云 PAI 平台功能与特点";
+    RetrievalQuery comparison = new RetrievalQuery(rewritten, "华为云 ModelArts 阿里云 PAI");
+    RetrievalQuery modelArtsQuery = new RetrievalQuery("华为云 ModelArts 平台功能与特点",
+        "华为云 ModelArts 功能 特点");
+    RetrievalQuery paiQuery = new RetrievalQuery("阿里云 PAI 平台功能与特点",
+        "阿里云 PAI 功能 特点");
     RetrievedChunk modelArts =
         new RetrievedChunk(1L, 3L, "ModelArts", 0, .9, "ModelArts 内容", null, null);
     RetrievedChunk pai = new RetrievedChunk(1L, 4L, "PAI", 0, .85, "PAI 内容", null, null);
@@ -129,9 +135,9 @@ class ConversationServiceTest {
     List<RetrievedChunk> evidence = List.of(pai.withRerankScore(.95),
         modelArts.withRerankScore(.9));
     when(fixture.queryRewrite.rewrite(question)).thenReturn(rewritten);
-    when(fixture.queryExpansion.expand(rewritten))
-        .thenReturn(List.of(rewritten, modelArtsQuery, paiQuery));
-    when(fixture.search.search(1L, rewritten, 20, .6)).thenReturn(List.of(modelArts));
+    when(fixture.queryExpansion.plan(rewritten))
+        .thenReturn(List.of(comparison, modelArtsQuery, paiQuery));
+    when(fixture.search.search(1L, comparison, 20, .6)).thenReturn(List.of(modelArts));
     when(fixture.search.search(1L, modelArtsQuery, 20, .6)).thenReturn(List.of(modelArts));
     when(fixture.search.search(1L, paiQuery, 20, .6)).thenReturn(List.of(pai));
     when(fixture.rerank.rerank(rewritten, fused, 6)).thenReturn(evidence);
@@ -145,7 +151,7 @@ class ConversationServiceTest {
     }).join();
 
     assertThat(result.references()).isEqualTo(evidence);
-    verify(fixture.search).search(1L, rewritten, 20, .6);
+    verify(fixture.search).search(1L, comparison, 20, .6);
     verify(fixture.search).search(1L, modelArtsQuery, 20, .6);
     verify(fixture.search).search(1L, paiQuery, 20, .6);
     verify(fixture.rerank).rerank(rewritten, fused, 6);
@@ -171,9 +177,9 @@ class ConversationServiceTest {
               new KnowledgeBase(1L, "kb", null, null, KnowledgeBaseStatus.ENABLED)));
       when(conversations.recentMessages(9L, 20)).thenReturn(List.of());
       when(queryRewrite.rewrite(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
-      when(queryExpansion.expand(anyString())).thenAnswer(invocation -> {
+      when(queryExpansion.plan(anyString())).thenAnswer(invocation -> {
         String query = invocation.getArgument(0);
-        return List.of(query);
+        return List.of(new RetrievalQuery(query, query));
       });
       when(conversations.saveMessage(anyLong(), anyString(), anyString(), anyString(), any(), any(),
           any())).thenReturn(10L);

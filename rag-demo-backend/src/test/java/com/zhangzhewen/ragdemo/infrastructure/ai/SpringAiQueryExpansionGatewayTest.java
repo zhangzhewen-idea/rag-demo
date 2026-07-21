@@ -1,51 +1,48 @@
 package com.zhangzhewen.ragdemo.infrastructure.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
+import com.zhangzhewen.ragdemo.infrastructure.ai.SpringAiQueryExpansionGateway.QueryPlanner;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.ai.rag.Query;
-import org.springframework.ai.rag.preretrieval.query.expansion.QueryExpander;
 
 /**
- * Spring AI 多查询扩展适配器测试。
+ * Spring AI 多路查询规划适配器测试。
  */
 class SpringAiQueryExpansionGatewayTest {
 
   /**
-   * 返回去空白、去重后的多条查询。
+   * 返回去重后的语义查询与关键词查询计划。
    */
   @Test
-  void returnsDistinctExpandedQueryTexts() {
-    QueryExpander expander = mock(QueryExpander.class);
-    SpringAiQueryExpansionGateway gateway = new SpringAiQueryExpansionGateway(expander);
-    when(expander.expand(any(Query.class))).thenReturn(List.of(
-        new Query("原始查询"), new Query(" 产品 A "), new Query("产品 A"), new Query("产品 B")));
+  void returnsDistinctRetrievalPlans() {
+    QueryPlanner planner = mock(QueryPlanner.class);
+    SpringAiQueryExpansionGateway gateway = new SpringAiQueryExpansionGateway(planner);
+    RetrievalQuery first = new RetrievalQuery("产品 A 的功能", "产品 A 功能");
+    RetrievalQuery second = new RetrievalQuery("产品 B 的功能", "产品 B 功能");
+    when(planner.plan("原始查询")).thenReturn(List.of(first, first, second));
 
-    List<String> result = gateway.expand("原始查询");
+    List<RetrievalQuery> result = gateway.plan("原始查询");
 
-    assertThat(result).containsExactly("原始查询", "产品 A", "产品 B");
-    ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
-    verify(expander).expand(query.capture());
-    assertThat(query.getValue().text()).isEqualTo("原始查询");
+    assertThat(result).containsExactly(first, second);
+    verify(planner).plan("原始查询");
   }
 
   /**
-   * expander 异常时只返回原始输入查询。
+   * planner 异常时语义查询和关键词查询都回退原始输入。
    */
   @Test
-  void fallsBackToInputQueryWhenExpansionFails() {
-    QueryExpander expander = mock(QueryExpander.class);
-    SpringAiQueryExpansionGateway gateway = new SpringAiQueryExpansionGateway(expander);
-    when(expander.expand(any(Query.class))).thenThrow(new IllegalStateException("模型不可用"));
+  void fallsBackToInputQueryWhenPlanningFails() {
+    QueryPlanner planner = mock(QueryPlanner.class);
+    SpringAiQueryExpansionGateway gateway = new SpringAiQueryExpansionGateway(planner);
+    when(planner.plan("原始查询")).thenThrow(new IllegalStateException("模型不可用"));
 
-    List<String> result = gateway.expand("原始查询");
+    List<RetrievalQuery> result = gateway.plan("原始查询");
 
-    assertThat(result).containsExactly("原始查询");
+    assertThat(result).containsExactly(new RetrievalQuery("原始查询", "原始查询"));
   }
 }

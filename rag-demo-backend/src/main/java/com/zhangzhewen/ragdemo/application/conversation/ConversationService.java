@@ -5,6 +5,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
@@ -128,8 +129,9 @@ public class ConversationService {
   private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
       List<Message> history) {
     String rewritten = queryRewrite.rewrite(contextualQuery(question, history));
-    List<List<RetrievedChunk>> rankings = queryExpansion.expand(rewritten).stream()
-        .map(query -> search.search(knowledgeBaseId, query, policy.candidateTopK(),
+    List<RetrievalQuery> plans = queryExpansion.plan(rewritten);
+    List<List<RetrievedChunk>> rankings = plans.stream()
+        .map(plan -> search.search(knowledgeBaseId, plan, policy.candidateTopK(),
             policy.similarityThreshold()))
         .toList();
     List<RetrievedChunk> candidates = ReciprocalRankFusion.fuse(rankings, policy.candidateTopK());
