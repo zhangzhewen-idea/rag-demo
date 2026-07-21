@@ -80,23 +80,31 @@ public class KnowledgeService {
         r.status() == null ? KnowledgeBaseStatus.ENABLED : KnowledgeBaseStatus.valueOf(r.status()));
   }
 
-  /** 校验并保存知识库封面。 */
+  /**
+   * 校验并保存知识库封面。
+   */
   @PreAuthorize("hasRole('ADMIN')")
   public String uploadCover(String originalName, String contentType, byte[] bytes) {
     if (bytes.length == 0 || bytes.length > MAX_COVER_SIZE) {
-      throw new BusinessException("COVER_SIZE_INVALID", "封面必须大于 0 且不超过 5 MB", HttpStatus.BAD_REQUEST);
+      throw new BusinessException("COVER_SIZE_INVALID", "封面必须大于 0 且不超过 5 MB",
+          HttpStatus.BAD_REQUEST);
     }
     String extension = extension(originalName);
-    if (!COVER_TYPES.containsKey(extension) || !COVER_TYPES.get(extension).equalsIgnoreCase(contentType)) {
-      throw new BusinessException("COVER_TYPE_UNSUPPORTED", "仅支持 PNG、JPEG、WebP 图片", HttpStatus.BAD_REQUEST);
+    if (!COVER_TYPES.containsKey(extension) || !COVER_TYPES.get(extension)
+        .equalsIgnoreCase(contentType)) {
+      throw new BusinessException("COVER_TYPE_UNSUPPORTED", "仅支持 PNG、JPEG、WebP 图片",
+          HttpStatus.BAD_REQUEST);
     }
     if (!signatureMatches(extension, bytes)) {
-      throw new BusinessException("COVER_CONTENT_MISMATCH", "图片内容与扩展名不匹配", HttpStatus.BAD_REQUEST);
+      throw new BusinessException("COVER_CONTENT_MISMATCH", "图片内容与扩展名不匹配",
+          HttpStatus.BAD_REQUEST);
     }
     return covers.save(extension, new ByteArrayInputStream(bytes));
   }
 
-  /** 读取公开封面。 */
+  /**
+   * 读取公开封面。
+   */
   public CoverStorageGateway.StoredCover cover(String fileName) {
     return covers.load(fileName);
   }
@@ -157,12 +165,15 @@ public class KnowledgeService {
 
   private boolean signatureMatches(String extension, byte[] bytes) {
     if (extension.equals("png")) {
-      return bytes.length >= 8 && (bytes[0] & 255) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G';
+      return bytes.length >= 8 && (bytes[0] & 255) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N'
+          && bytes[3] == 'G';
     }
     if (extension.equals("jpg") || extension.equals("jpeg")) {
-      return bytes.length >= 3 && (bytes[0] & 255) == 0xff && (bytes[1] & 255) == 0xd8 && (bytes[2] & 255) == 0xff;
+      return bytes.length >= 3 && (bytes[0] & 255) == 0xff && (bytes[1] & 255) == 0xd8
+          && (bytes[2] & 255) == 0xff;
     }
-    return bytes.length >= 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+    return bytes.length >= 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F'
+        && bytes[3] == 'F'
         && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
   }
 }
