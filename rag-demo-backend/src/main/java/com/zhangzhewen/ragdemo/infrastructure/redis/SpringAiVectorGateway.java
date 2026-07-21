@@ -2,11 +2,14 @@ package com.zhangzhewen.ragdemo.infrastructure.redis;
 
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Component;
-import java.util.*;
 
 /**
  * Spring AI RedisVectorStore 适配器。

@@ -2,19 +2,71 @@ package com.zhangzhewen.ragdemo.infrastructure.storage;
 
 import com.zhangzhewen.ragdemo.domain.gateway.AvatarStorageGateway;
 import com.zhangzhewen.ragdemo.infrastructure.config.RagProperties;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** 本地用户头像存储实现。 */
+/**
+ * 本地用户头像存储实现。
+ */
 @Component
 public class LocalAvatarStorageGateway implements AvatarStorageGateway {
-    private static final Map<String,String> TYPES=Map.of("png","image/png","jpg","image/jpeg","jpeg","image/jpeg","webp","image/webp");
-    private final Path root;
-    /** 头像固定保存到上传根目录下的 avatars 子目录。 */ public LocalAvatarStorageGateway(RagProperties properties){root=Path.of(properties.storageRoot(),"avatars").toAbsolutePath().normalize();}
-    @Override public String save(String extension,InputStream input){try{Files.createDirectories(root);Path target=safe(root.resolve(UUID.randomUUID()+"."+extension));Files.copy(input,target,StandardCopyOption.REPLACE_EXISTING);return "/api/avatars/"+target.getFileName();}catch(IOException e){throw new UncheckedIOException("头像保存失败",e);}}
-    @Override public StoredAvatar load(String fileName){try{Path path=safe(root.resolve(fileName));String type=TYPES.get(extension(fileName));if(!Files.isRegularFile(path)||type==null)throw new FileNotFoundException(fileName);return new StoredAvatar(Files.readAllBytes(path),type);}catch(IOException e){throw new UncheckedIOException("头像读取失败",e);}}
-    private Path safe(Path path){Path normalized=path.toAbsolutePath().normalize();if(!normalized.startsWith(root))throw new SecurityException("头像路径越界");return normalized;}
-    private String extension(String name){int dot=name.lastIndexOf('.');return dot<0?"":name.substring(dot+1).toLowerCase(Locale.ROOT);}
+
+  private static final Map<String, String> TYPES = Map.of("png", "image/png", "jpg", "image/jpeg",
+      "jpeg", "image/jpeg", "webp", "image/webp");
+  private final Path root;
+
+  /**
+   * 头像固定保存到上传根目录下的 avatars 子目录。
+   */
+  public LocalAvatarStorageGateway(RagProperties properties) {
+    root = Path.of(properties.storageRoot(), "avatars").toAbsolutePath().normalize();
+  }
+
+  @Override
+  public String save(String extension, InputStream input) {
+    try {
+      Files.createDirectories(root);
+      Path target = safe(root.resolve(UUID.randomUUID() + "." + extension));
+      Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
+      return "/api/avatars/" + target.getFileName();
+    } catch (IOException e) {
+      throw new UncheckedIOException("头像保存失败", e);
+    }
+  }
+
+  @Override
+  public StoredAvatar load(String fileName) {
+    try {
+      Path path = safe(root.resolve(fileName));
+      String type = TYPES.get(extension(fileName));
+      if (!Files.isRegularFile(path) || type == null) {
+        throw new FileNotFoundException(fileName);
+      }
+      return new StoredAvatar(Files.readAllBytes(path), type);
+    } catch (IOException e) {
+      throw new UncheckedIOException("头像读取失败", e);
+    }
+  }
+
+  private Path safe(Path path) {
+    Path normalized = path.toAbsolutePath().normalize();
+    if (!normalized.startsWith(root)) {
+      throw new SecurityException("头像路径越界");
+    }
+    return normalized;
+  }
+
+  private String extension(String name) {
+    int dot = name.lastIndexOf('.');
+    return dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
+  }
 }
