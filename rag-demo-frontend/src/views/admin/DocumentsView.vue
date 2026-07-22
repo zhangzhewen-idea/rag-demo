@@ -206,12 +206,15 @@ function tag(status: string) {
         <p>上传后自动完成解析、切片和向量入库；“已入库”表示可以直接检索与问答。</p>
       </div>
       <div class="head-actions">
-        <el-select v-model="selected" placeholder="选择知识库" style="width: 220px">
+        <el-select v-model="selected" aria-label="选择知识库"
+                   placeholder="选择知识库" style="width: 220px">
           <el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id"/>
         </el-select>
         <el-upload :show-file-list="false" :accept="accept" :auto-upload="false"
-                   :on-change="selectFile">
-          <el-button type="primary" :loading="uploading" :disabled="!selected">上传文档</el-button>
+                   :disabled="!selected || uploading" :on-change="selectFile">
+          <span class="sr-only">上传文档</span>
+          <span class="el-button el-button--primary" aria-hidden="true"
+                :class="{ 'is-disabled': !selected || uploading }">上传文档</span>
         </el-upload>
       </div>
     </header>
@@ -337,6 +340,18 @@ function tag(status: string) {
 </template>
 
 <style scoped>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .upload-file-row,
 .preview-stats,
 .chunk-preview-item header,

@@ -67,6 +67,26 @@ describe('文档切片预览', () => {
     vi.unstubAllGlobals()
   })
 
+  it('为知识库选择框提供名称且上传入口只有一个按钮语义', async () => {
+    const wrapper = mount(DocumentsView, {
+      attachTo: document.body,
+      global: {plugins: [ElementPlus]},
+    })
+    await flushPromises()
+
+    const knowledgeSelect = document.querySelector('.head-actions [role="combobox"]')
+    expect(knowledgeSelect?.getAttribute('aria-label')).toBe('选择知识库')
+
+    const upload = document.querySelector('.head-actions .el-upload')
+    expect(upload?.getAttribute('role')).toBe('button')
+    expect(upload?.querySelector('.sr-only')?.textContent).toBe('上传文档')
+
+    expect(upload?.querySelectorAll('button')).toHaveLength(0)
+    const visualButton = upload?.querySelector('.el-button')
+    expect(visualButton?.getAttribute('aria-hidden')).toBe('true')
+    wrapper.unmount()
+  })
+
   it('默认使用两个换行切分，参数变化后必须重新预览，重置恢复默认值', async () => {
     const wrapper = mount(DocumentsView, {
       attachTo: document.body,
