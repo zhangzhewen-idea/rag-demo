@@ -56,7 +56,7 @@ public class DocumentIngestionWorker {
     }
     try {
       List<DocumentParserGateway.ParsedChunk> chunks = parser.parse(document.storagePath(),
-          document.extension(), policy.chunkSize(), policy.chunkOverlap());
+          document.extension(), document.chunkingConfig());
       for (int start = 0; start < chunks.size(); start += policy.embeddingBatchSize()) {
         int end = Math.min(chunks.size(), start + policy.embeddingBatchSize());
         List<String> texts = new ArrayList<>();

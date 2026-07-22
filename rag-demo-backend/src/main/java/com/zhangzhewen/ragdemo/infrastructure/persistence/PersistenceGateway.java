@@ -13,6 +13,7 @@ import com.zhangzhewen.ragdemo.domain.identity.Role;
 import com.zhangzhewen.ragdemo.domain.identity.User;
 import com.zhangzhewen.ragdemo.domain.identity.UserStatus;
 import com.zhangzhewen.ragdemo.domain.knowledge.DocumentStatus;
+import com.zhangzhewen.ragdemo.domain.knowledge.ChunkingConfig;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeBase;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeBaseStatus;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeDocument;
@@ -278,14 +279,20 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
       rs.getString("stored_name"), rs.getString("storage_path"), rs.getString("extension"),
       rs.getString("mime_type"), rs.getLong("file_size"), rs.getString("content_hash"),
       DocumentStatus.valueOf(rs.getString("status")), rs.getInt("chunk_count"),
-      rs.getInt("retry_count"), rs.getString("failure_stage"), rs.getString("failure_reason"));
+      rs.getInt("retry_count"), rs.getString("failure_stage"), rs.getString("failure_reason"),
+      new ChunkingConfig(ChunkingConfig.Strategy.valueOf(rs.getString("chunk_strategy")),
+          rs.getString("chunk_separator"), rs.getInt("chunk_size"),
+          rs.getInt("chunk_overlap"), rs.getBoolean("normalize_whitespace")));
 
   @Override
   public Long create(KnowledgeDocument d, Long creatorId) {
     return insert(
-        "INSERT INTO kb_document(knowledge_base_id,original_name,stored_name,storage_path,extension,mime_type,file_size,content_hash,status,created_by) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO kb_document(knowledge_base_id,original_name,stored_name,storage_path,extension,mime_type,file_size,content_hash,status,chunk_strategy,chunk_separator,chunk_size,chunk_overlap,normalize_whitespace,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         d.knowledgeBaseId(), d.originalName(), d.storedName(), d.storagePath(), d.extension(),
-        d.mimeType(), d.fileSize(), d.contentHash(), d.status().name(), creatorId);
+        d.mimeType(), d.fileSize(), d.contentHash(), d.status().name(),
+        d.chunkingConfig().strategy().name(), d.chunkingConfig().separator(),
+        d.chunkingConfig().maxChunkLength(), d.chunkingConfig().overlapLength(),
+        d.chunkingConfig().normalizeWhitespace(), creatorId);
   }
 
   @Override

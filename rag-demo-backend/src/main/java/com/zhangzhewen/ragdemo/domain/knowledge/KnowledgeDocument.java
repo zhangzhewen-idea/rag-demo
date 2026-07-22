@@ -8,6 +8,7 @@ public record KnowledgeDocument(Long id, Long knowledgeBaseId, String originalNa
                                 String storagePath, String extension, String mimeType,
                                 long fileSize, String contentHash,
                                 DocumentStatus status, int chunkCount, int retryCount,
-                                String failureStage, String failureReason) {
+                                String failureStage, String failureReason,
+                                ChunkingConfig chunkingConfig) {
 
 }

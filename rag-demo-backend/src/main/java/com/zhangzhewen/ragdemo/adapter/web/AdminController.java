@@ -160,10 +160,27 @@ public class AdminController {
    */
   @PostMapping("/knowledge-bases/{id}/documents")
   public ApiResponse<Map<String, Long>> upload(@PathVariable Long id,
-      @RequestPart("file") MultipartFile file, Authentication a) throws IOException {
+      @RequestPart("file") MultipartFile file,
+      @Valid @RequestPart(value = "config", required = false)
+      KnowledgeDtos.ChunkingConfigRequest config,
+      @RequestPart(value = "configFingerprint", required = false) String configFingerprint,
+      Authentication a) throws IOException {
     return WebSupport.ok(Map.of("id",
         documents.upload(id, Objects.requireNonNullElse(file.getOriginalFilename(), "upload"),
-            file.getContentType(), file.getBytes(), WebSupport.userId(a))));
+            file.getBytes(), WebSupport.userId(a), config,
+            configFingerprint)));
+  }
+
+  /**
+   * 不落盘预览文档的真实切片结果。
+   */
+  @PostMapping("/knowledge-bases/{id}/documents/chunks/preview")
+  public ApiResponse<KnowledgeDtos.ChunkPreviewResponse> previewChunks(@PathVariable Long id,
+      @RequestPart("file") MultipartFile file,
+      @Valid @RequestPart("config") KnowledgeDtos.ChunkingConfigRequest config)
+      throws IOException {
+    return WebSupport.ok(documents.preview(id,
+        Objects.requireNonNullElse(file.getOriginalFilename(), "upload"), file.getBytes(), config));
   }
 
   /**

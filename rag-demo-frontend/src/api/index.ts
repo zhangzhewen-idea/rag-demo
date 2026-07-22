@@ -3,6 +3,8 @@ import type {
   ApiResponse,
   Conversation,
   CreateEvaluationDataset,
+  ChunkingConfig,
+  ChunkPreview,
   DocumentTask,
   EvaluationDataset,
   EvaluationReviewVerdict,
@@ -62,9 +64,19 @@ export const adminApi = {
     return api(http.post<ApiResponse<{ url: string }>>('/admin/knowledge-bases/covers', data))
   },
   documents: (id: number) => api(http.get<ApiResponse<DocumentTask[]>>(`/admin/knowledge-bases/${id}/documents`)),
-  upload: (id: number, file: File) => {
+  previewChunks: (id: number, file: File, config: ChunkingConfig) => {
     const data = new FormData();
     data.append('file', file);
+    data.append('config', new Blob([JSON.stringify(config)], {type: 'application/json'}));
+    return api(http.post<ApiResponse<ChunkPreview>>(
+      `/admin/knowledge-bases/${id}/documents/chunks/preview`, data
+    ))
+  },
+  upload: (id: number, file: File, config?: ChunkingConfig, configFingerprint?: string) => {
+    const data = new FormData();
+    data.append('file', file);
+    if (config) data.append('config', new Blob([JSON.stringify(config)], {type: 'application/json'}));
+    if (configFingerprint) data.append('configFingerprint', configFingerprint);
     return api(http.post<ApiResponse<{
       id: number
     }>>(`/admin/knowledge-bases/${id}/documents`, data))

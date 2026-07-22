@@ -62,6 +62,37 @@ export interface DocumentTask {
   failureReason?: string
 }
 
+export interface ChunkingConfig {
+  strategy: 'AUTO' | 'CUSTOM';
+  separator: string | null;
+  maxChunkLength: number;
+  overlapLength: number;
+  normalizeWhitespace: boolean
+}
+
+export interface ChunkPreviewItem {
+  index: number;
+  content: string;
+  characterCount: number;
+  overlapCharacters: number;
+  pageNumber?: number;
+  sectionTitle?: string
+}
+
+export interface ChunkPreview {
+  configFingerprint: string;
+  totalChunks: number;
+  previewedChunks: number;
+  truncated: boolean;
+  statistics: {
+    minCharacters: number;
+    maxCharacters: number;
+    averageCharacters: number;
+    shortChunkCount: number
+  };
+  chunks: ChunkPreviewItem[]
+}
+
 export type EvaluationAnswerType = 'FACTUAL' | 'PROCEDURE' | 'COMPARISON' | 'REFUSAL' | 'SUMMARY'
 export type EvaluationReviewVerdict = 'ACCURATE' | 'INACCURATE'
 

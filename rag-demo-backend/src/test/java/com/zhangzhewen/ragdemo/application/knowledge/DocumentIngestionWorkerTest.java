@@ -10,6 +10,7 @@ import com.zhangzhewen.ragdemo.domain.gateway.DocumentGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentParserGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
 import com.zhangzhewen.ragdemo.domain.knowledge.DocumentStatus;
+import com.zhangzhewen.ragdemo.domain.knowledge.ChunkingConfig;
 import com.zhangzhewen.ragdemo.domain.knowledge.IngestionPolicy;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeDocument;
 import java.util.List;
@@ -54,13 +55,13 @@ class DocumentIngestionWorkerTest {
     private Fixture() {
       KnowledgeDocument document = new KnowledgeDocument(7L, 1L, "document.txt", "stored.txt",
           "/tmp/document.txt", "txt", "text/plain", 10L, "hash", DocumentStatus.PENDING, 0, 0,
-          null, null);
+          null, null, ChunkingConfig.auto(800, 100));
       when(documents.findDocumentById(7L)).thenReturn(Optional.of(document));
       when(documents.transit(7L, DocumentStatus.PENDING, DocumentStatus.PROCESSING))
           .thenReturn(true);
-      when(parser.parse("/tmp/document.txt", "txt", 800, 100)).thenReturn(List.of(
-          new DocumentParserGateway.ParsedChunk("第一段", Map.of()),
-          new DocumentParserGateway.ParsedChunk("第二段", Map.of())));
+      when(parser.parse("/tmp/document.txt", "txt", ChunkingConfig.auto(800, 100))).thenReturn(
+          List.of(new DocumentParserGateway.ParsedChunk("第一段", Map.of(), 0),
+              new DocumentParserGateway.ParsedChunk("第二段", Map.of(), 0)));
     }
   }
 }

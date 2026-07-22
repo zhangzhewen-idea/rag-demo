@@ -7,6 +7,7 @@ import com.zhangzhewen.ragdemo.domain.gateway.TokenEstimator;
 import com.zhangzhewen.ragdemo.domain.identity.AuthPolicy;
 import com.zhangzhewen.ragdemo.domain.identity.JwtPolicy;
 import com.zhangzhewen.ragdemo.domain.knowledge.IngestionPolicy;
+import com.zhangzhewen.ragdemo.domain.knowledge.TextChunkingPolicy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.boot.ApplicationRunner;
@@ -76,6 +77,14 @@ public class StorageConfig {
   IngestionPolicy ingestionPolicy(RagProperties properties) {
     return new IngestionPolicy(properties.ingestion().chunkSize(),
         properties.ingestion().chunkOverlap(), properties.ingestion().embeddingBatchSize());
+  }
+
+  /**
+   * 暴露无状态的自定义文本切片规则。
+   */
+  @Bean
+  TextChunkingPolicy textChunkingPolicy() {
+    return new TextChunkingPolicy();
   }
 
   /**
