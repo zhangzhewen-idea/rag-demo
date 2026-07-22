@@ -27,7 +27,7 @@ services:
       SERVER_PORT: "8080"
       RAG_STORAGE_ROOT: /app/uploads
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8089}:8089"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

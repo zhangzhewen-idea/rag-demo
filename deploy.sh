@@ -72,7 +72,7 @@ fi
 
 for required_name in \
     DB_URL DB_USERNAME DB_PASSWORD \
-    REDIS_HOST REDIS_PORT REDIS_PASSWORD \
+    REDIS_HOST REDIS_PORT \
     JWT_SECRET DASHSCOPE_API_KEY RAG_DOCKER_DATA_ROOT; do
     require_env_value "${required_name}"
 done

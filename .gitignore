@@ -6,6 +6,7 @@ out/
 !**/src/test/**/target/
 data/
 log/
+.env.docker
 
 ### STS ###
 .apt_generated
