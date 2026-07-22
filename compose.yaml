@@ -1,0 +1,40 @@
+services:
+  rag-demo-frontend:
+    image: rag-demo-frontend:local
+    build:
+      context: ./rag-demo-frontend
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - rag-demo-backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+  rag-demo-backend:
+    image: rag-demo-backend:local
+    pull_policy: never
+    build:
+      context: ./rag-demo-backend
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    env_file:
+      - path: ${RAG_ENV_FILE:-.env.docker}
+        required: true
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "8080"
+      RAG_STORAGE_ROOT: /app/uploads
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - type: bind
+        source: ${RAG_DOCKER_DATA_ROOT:-/Users/zhangzhewen/data/ragdemo}/uploads
+        target: /app/uploads
+      - type: bind
+        source: ${RAG_DOCKER_DATA_ROOT:-/Users/zhangzhewen/data/ragdemo}/log
+        target: /app/log
+    stop_grace_period: 30s

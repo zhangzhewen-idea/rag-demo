@@ -1,24 +1,17 @@
 spring:
   application:
     name: rag-demo-backend
-  datasource:
-    url: ${DB_URL:jdbc:mysql://192.168.50.6:3306/rag_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+  profiles:
+    default: dev
   data:
     redis:
       client-type: jedis
-      host: ${REDIS_HOST:192.168.50.6}
-      port: ${REDIS_PORT:6380}
-      password: ${REDIS_PASSWORD:}
   servlet:
     multipart:
       max-file-size: 20MB
       max-request-size: 21MB
   ai:
     openai:
-      api-key: ${DASHSCOPE_API_KEY:${OPENAPI_KEY:local-placeholder}}
-      base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
       chat:
         options:
           model: deepseek-v4-flash
@@ -49,9 +42,7 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 rag:
-  storage-root: ${RAG_STORAGE_ROOT:/Users/zhangzhewen/data/ragdemo/uploads}
   jwt:
-    secret: ${JWT_SECRET:change-this-development-secret-at-least-32-bytes}
     access-ttl: 30m
     refresh-ttl: 7d
   retrieval:
@@ -70,8 +61,6 @@ rag:
   reranking:
     enabled: ${RAG_RERANK_ENABLED:true}
     model: ${RAG_RERANK_MODEL:qwen3-rerank}
-    base-url: ${DASHSCOPE_RERANK_BASE_URL:https://dashscope.aliyuncs.com/compatible-api/v1/reranks}
-    api-key: ${DASHSCOPE_API_KEY:${OPENAPI_KEY:local-placeholder}}
     timeout: ${RAG_RERANK_TIMEOUT:5s}
   ingestion:
     chunk-size: 800
@@ -96,12 +85,8 @@ management:
         include: health,info
 
 logging:
-  level:
-    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: ${AI_INTERACTION_LOG_LEVEL:DEBUG}
   pattern:
     level: "%5p [requestId:%X{requestId:-}]"
-  file:
-    name: log/main.log
   logback:
     rollingpolicy:
       max-file-size: 10MB

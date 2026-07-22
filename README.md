@@ -1,4 +1,69 @@
-# RAG Demo 后端
+# RAG Demo
+
+前后端分离的企业知识库 RAG 教学项目。后端位于 `rag-demo-backend/`，前端位于
+`rag-demo-frontend/`。
+
+## 开发与生产环境
+
+后端默认启用 `dev` Profile，无需额外参数：
+
+```bash
+cd rag-demo-backend
+./mvnw spring-boot:run
+```
+
+生产环境使用 `prod` Profile，数据库、Redis、JWT 和百炼凭据均必须通过环境变量注入：
+
+```bash
+SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
+```
+
+前端提供独立的开发和生产模式命令：
+
+```bash
+cd rag-demo-frontend
+npm run dev
+npm run dev:prod
+npm run build:dev
+npm run build:prod
+```
+
+开发服务默认运行在 `http://localhost:5173`，并将 `/api` 代理到 `http://localhost:8080`。
+生产构建仍使用相对 `/api`，由部署环境的 Nginx 反向代理后端。
+
+## Docker 一键发布
+
+Docker Compose 只运行前端和后端，MySQL 与 Redis Stack 由外部环境提供。首次发布前准备本地配置：
+
+```bash
+cp deploy.env.example .env.docker
+```
+
+编辑 `.env.docker`，填写真实的 `DB_*`、`REDIS_*`、`JWT_SECRET`、`DASHSCOPE_API_KEY` 和
+`RAG_DOCKER_DATA_ROOT`。该文件已被 Git 和项目读取规则忽略，不得提交。
+
+完成一次性配置后，在仓库根目录执行：
+
+```bash
+./deploy.sh
+```
+
+默认 Compose 项目名为 `rag-demo`，也可显式指定：
+
+```bash
+./deploy.sh my-rag-demo
+```
+
+发布成功后，前端入口为 `http://localhost:3000`，后端健康检查为
+`http://localhost:8080/actuator/health`。常用运维命令：
+
+```bash
+docker compose --project-name rag-demo --file compose.yaml logs --follow
+docker compose --project-name rag-demo --file compose.yaml down
+```
+
+发布脚本会在宿主机通过 Maven Wrapper 打包后端，再构建前后端镜像、启动容器并执行有界健康检查。
+脚本不会创建 MySQL、Redis Stack，也不会重建 Redis 索引。
 
 ## 技术栈
 
@@ -17,10 +82,10 @@ adapter -> application -> domain <- infrastructure
 
 | 变量                          | 说明                | 开发默认值                                            |
 |-----------------------------|-------------------|--------------------------------------------------|
-| `DB_URL`                    | MySQL JDBC 地址     | `jdbc:mysql://localhost:3308/rag_demo...`        |
+| `DB_URL`                    | MySQL JDBC 地址     | `jdbc:mysql://192.168.50.6:3306/rag_demo...`     |
 | `DB_USERNAME`               | MySQL 用户          | `root`                                           |
 | `DB_PASSWORD`               | MySQL 密码          | 空                                                |
-| `REDIS_HOST` / `REDIS_PORT` | Redis Stack       | `localhost` / `6380`                             |
+| `REDIS_HOST` / `REDIS_PORT` | Redis Stack       | `192.168.50.6` / `6380`                          |
 | `REDIS_PASSWORD`            | Redis 密码          | 空                                                |
 | `JWT_SECRET`                | 至少 32 字节的 HMAC 密钥 | 仅有不安全开发占位值                                       |
 | `DASHSCOPE_API_KEY`         | 阿里云百炼 API Key     | 无有效默认值                                           |

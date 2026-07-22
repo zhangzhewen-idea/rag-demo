@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+  ai:
+    openai:
+      api-key: ${DASHSCOPE_API_KEY}
+      base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+
+rag:
+  storage-root: ${RAG_STORAGE_ROOT:/app/uploads}
+  jwt:
+    secret: ${JWT_SECRET}
+  reranking:
+    base-url: ${DASHSCOPE_RERANK_BASE_URL:https://dashscope.aliyuncs.com/compatible-api/v1/reranks}
+    api-key: ${DASHSCOPE_API_KEY}
+
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: ${AI_INTERACTION_LOG_LEVEL:INFO}
+  file:
+    name: /app/log/main.log

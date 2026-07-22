@@ -1,0 +1,5 @@
+services:
+  rag-demo-backend:
+    build:
+      args:
+        JAR_FILE: ${RAG_DEMO_JAR_FILE:?请通过 deploy.sh 构建后端服务}

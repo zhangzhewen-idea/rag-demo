@@ -71,6 +71,8 @@ cd rag-demo-frontend
 npm test
 npm run type-check
 npm run build
+npm run build:dev
+npm run build:prod
 ```
 
 本地启动与有界可达性检查：
@@ -88,6 +90,36 @@ curl --fail --max-time 5 --head http://localhost:5173
 
 当前 `package.json` 没有 `lint` 脚本，不得虚构 `npm run lint` 门禁。`npm run build` 已包含
 `vue-tsc -b`，但质量门禁仍单独运行 `npm run type-check`，使类型失败更清晰。
+
+## 环境与 Docker 发布
+
+后端默认使用 `dev` Profile；生产运行必须显式使用 `prod` Profile，并通过环境变量注入外部依赖和凭据。
+前端 `npm run build` 等价于 `npm run build:prod`。
+
+首次准备本机 Docker 发布配置：
+
+```bash
+cp deploy.env.example .env.docker
+```
+
+`.env.docker` 包含真实凭据，禁止提交、读取或输出。填写完成后，在仓库根目录执行一键发布：
+
+```bash
+./deploy.sh
+```
+
+发布资产的无副作用验证命令：
+
+```bash
+bash -n deploy.sh
+RAG_ENV_FILE=deploy.env.example \
+RAG_DEMO_JAR_FILE=target/rag-demo-backend-0.0.1-SNAPSHOT.jar \
+docker compose --env-file deploy.env.example \
+  --file compose.yaml --file compose.backend-build.yaml config
+```
+
+真实 `./deploy.sh` 会启动容器、连接外部 MySQL/Redis 并执行 Flyway，必须先获得用户明确批准；普通质量门禁只验证
+脚本语法、Compose 展开和镜像构建，不执行 `compose up`。
 
 ## RAG 评估与在线模型调用
 
