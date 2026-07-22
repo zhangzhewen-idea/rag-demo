@@ -51,13 +51,12 @@ public class UserService {
   }
 
   /**
-   * 创建用户，默认密码为 123456。
+   * 创建用户，初始密码必须由管理员明确提供。
    */
   @PreAuthorize("hasRole('ADMIN')")
   public Long create(UserDtos.CreateRequest r) {
     try {
-      return users.create(r.username(), passwords.encode(
-              r.password() == null || r.password().isBlank() ? "123456" : r.password()), r.nickname(),
+      return users.create(r.username(), passwords.encode(requiredPassword(r.password())), r.nickname(),
           r.avatarUrl(), status(r.status()), roles(r.roles()));
     } catch (DuplicateKeyException e) {
       throw new BusinessException("USERNAME_EXISTS", "用户名已存在", HttpStatus.CONFLICT);
@@ -75,11 +74,18 @@ public class UserService {
   }
 
   /**
-   * 重置密码，空值使用 123456。
+   * 使用管理员明确提供的新密码重置账号密码。
    */
   @PreAuthorize("hasRole('ADMIN')")
   public void reset(Long id, String raw) {
-    users.resetPassword(id, passwords.encode(raw == null || raw.isBlank() ? "123456" : raw));
+    users.resetPassword(id, passwords.encode(requiredPassword(raw)));
+  }
+
+  private String requiredPassword(String raw) {
+    if (raw == null || raw.isBlank()) {
+      throw new BusinessException("PASSWORD_REQUIRED", "请输入密码", HttpStatus.BAD_REQUEST);
+    }
+    return raw;
   }
 
   /**

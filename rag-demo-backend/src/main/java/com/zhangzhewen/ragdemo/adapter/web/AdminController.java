@@ -102,8 +102,8 @@ public class AdminController {
    */
   @PostMapping("/users/{id}/reset-password")
   public ApiResponse<Void> reset(@PathVariable Long id,
-      @RequestBody(required = false) UserDtos.ResetPasswordRequest r) {
-    users.reset(id, r == null ? null : r.password());
+      @Valid @RequestBody UserDtos.ResetPasswordRequest r) {
+    users.reset(id, r.password());
     return WebSupport.ok(null);
   }
 

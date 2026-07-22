@@ -52,7 +52,9 @@ export const adminApi = {
     data.append('file', file);
     return api(http.post<ApiResponse<{ url: string }>>('/admin/users/avatars', data))
   },
-  resetPassword: (id: number) => api(http.post<ApiResponse<unknown>>(`/admin/users/${id}/reset-password`, {})),
+  resetPassword: (id: number, password: string) => api(http.post<ApiResponse<unknown>>(
+    `/admin/users/${id}/reset-password`, {password}
+  )),
   knowledge: () => api(http.get<ApiResponse<KnowledgeBase[]>>('/admin/knowledge-bases')),
   createKnowledge: (data: unknown) => api(http.post<ApiResponse<{
     id: number

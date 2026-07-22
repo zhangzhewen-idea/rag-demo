@@ -19,7 +19,8 @@ public final class UserDtos {
   public record CreateRequest(
       @NotBlank(message = "请输入账号") @Size(max = 64, message = "账号不能超过 64 个字符") String username,
       @NotBlank(message = "请输入昵称") @Size(max = 64, message = "昵称不能超过 64 个字符") String nickname,
-      @Size(max = 100, message = "初始密码不能超过 100 个字符") String password,
+      @NotBlank(message = "请输入初始密码")
+      @Size(min = 6, max = 100, message = "初始密码长度应为 6 至 100 个字符") String password,
       @Size(max = 512, message = "头像 URL 不能超过 512 个字符") String avatarUrl,
       String status,
       @NotEmpty(message = "请至少选择一个角色") Set<String> roles) {
@@ -40,7 +41,9 @@ public final class UserDtos {
   /**
    * 重置密码。
    */
-  public record ResetPasswordRequest(String password) {
+  public record ResetPasswordRequest(
+      @NotBlank(message = "请输入新密码")
+      @Size(min = 6, max = 100, message = "新密码长度应为 6 至 100 个字符") String password) {
 
   }
 }
