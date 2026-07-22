@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {nextTick, onMounted, ref} from 'vue'
+import {nextTick, onBeforeUnmount, onMounted, ref} from 'vue'
 import {useRoute} from 'vue-router'
 import {ElMessage, type InputInstance} from 'element-plus'
 import {useAuthStore} from '@/stores/auth'
@@ -18,6 +18,11 @@ const references = ref<Reference[]>([])
 const drawer = ref(false)
 const controller = ref<AbortController>()
 const questionInput = ref<InputInstance>()
+const messagesContainer = ref<HTMLElement>()
+const showScrollButton = ref(false)
+const followsLatestMessage = ref(true)
+const waitingSeconds = ref(0)
+let waitingTimer: number | undefined
 
 onMounted(load)
 
@@ -26,7 +31,35 @@ async function load() {
   conversation.value = data.conversation
   messages.value = data.messages
   await nextTick()
+  scrollToBottom('auto')
   questionInput.value?.focus()
+}
+
+function updateScrollState() {
+  const container = messagesContainer.value
+  if (!container) return
+  const distance = container.scrollHeight - container.scrollTop - container.clientHeight
+  followsLatestMessage.value = distance < 100
+  showScrollButton.value = distance >= 100
+}
+
+function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
+  const container = messagesContainer.value
+  if (!container) return
+  container.scrollTo({top: container.scrollHeight, behavior})
+  followsLatestMessage.value = true
+  showScrollButton.value = false
+}
+
+function startWaiting() {
+  waitingSeconds.value = 0
+  if (waitingTimer !== undefined) window.clearInterval(waitingTimer)
+  waitingTimer = window.setInterval(() => waitingSeconds.value++, 1000)
+}
+
+function stopWaiting() {
+  if (waitingTimer !== undefined) window.clearInterval(waitingTimer)
+  waitingTimer = undefined
 }
 
 async function send() {
@@ -50,15 +83,16 @@ async function send() {
   }
   messages.value.push(answer)
   generating.value = true
+  startWaiting()
   controller.value = new AbortController()
+  await nextTick()
+  scrollToBottom()
   try {
     await streamChat(id, text, {
       delta: value => {
+        const shouldFollow = followsLatestMessage.value
         answer.content += value
-        nextTick(() => document.querySelector('.messages')?.scrollTo({
-          top: 999999,
-          behavior: 'smooth'
-        }))
+        if (shouldFollow) nextTick(() => scrollToBottom())
       },
       references: value => {
         references.value = value
@@ -82,6 +116,7 @@ async function send() {
     }
   } finally {
     generating.value = false
+    stopWaiting()
   }
 }
 
@@ -102,6 +137,11 @@ async function copy(text: string) {
   await navigator.clipboard.writeText(text)
   ElMessage.success('已复制')
 }
+
+onBeforeUnmount(() => {
+  stopWaiting()
+  controller.value?.abort()
+})
 </script>
 
 <template>
@@ -114,7 +154,7 @@ async function copy(text: string) {
         }}
       </el-button>
     </header>
-    <section class="messages">
+    <section ref="messagesContainer" class="messages" @scroll="updateScrollState">
       <div v-if="!messages.length" class="chat-empty">
         <div class="spark">✦</div>
         <h2>想从知识库中了解什么？</h2>
@@ -128,7 +168,13 @@ async function copy(text: string) {
         <div v-else class="avatar">AI</div>
         <div class="bubble">
           <p><span v-if="generating && message === messages.at(-1) && !message.content"
-                   class="thinking">正在思考，请稍作等待…</span>
+                   class="thinking">
+            <span class="thinking-title">正在检索并整理知识库证据<span class="thinking-dots"
+                                                                  aria-hidden="true"><i/><i/><i/></span></span>
+            <small>回答会严格依据当前知识库中的可用资料<span v-if="waitingSeconds"> · 已等待 {{
+                waitingSeconds
+              }} 秒</span></small>
+          </span>
             <template v-else>{{ message.content }}</template>
             <span v-if="generating && message === messages.at(-1) && message.content"
                   class="cursor"/></p>
@@ -144,6 +190,9 @@ async function copy(text: string) {
         </div>
       </article>
     </section>
+    <el-button v-show="showScrollButton" class="scroll-bottom" circle aria-label="回到底部"
+               title="回到底部" @click="scrollToBottom()">↓
+    </el-button>
     <footer class="composer">
       <div class="input-wrap">
         <el-input ref="questionInput" v-model="question" type="textarea" :rows="2" resize="none"
@@ -170,7 +219,71 @@ async function copy(text: string) {
 </template>
 
 <style scoped>
+.chat-page {
+  position: relative;
+}
+
 .thinking {
-  color: #756e7d;
+  display: flex;
+  min-width: 280px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 2px;
+  color: #514960;
+}
+
+.thinking-title {
+  font-weight: 650;
+}
+
+.thinking small {
+  color: #8a8393;
+  font-size: 12px;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.thinking-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7652ee;
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+
+.thinking-dots i:nth-child(2) {
+  animation-delay: .15s;
+}
+
+.thinking-dots i:nth-child(3) {
+  animation-delay: .3s;
+}
+
+.scroll-bottom {
+  position: absolute;
+  right: max(6vw, 55px);
+  bottom: 132px;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-color: #dcd4f1;
+  color: #6542df;
+  box-shadow: 0 8px 24px #50318f2b;
+}
+
+@keyframes thinking-bounce {
+  0%, 60%, 100% {
+    opacity: .35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
 }
 </style>
