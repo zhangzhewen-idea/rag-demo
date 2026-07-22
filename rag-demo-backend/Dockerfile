@@ -8,6 +8,6 @@ COPY ${JAR_FILE} /app/app.jar
 
 RUN mkdir -p /app/uploads /app/log
 
-EXPOSE 8080
+EXPOSE 8089
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

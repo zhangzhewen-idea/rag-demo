@@ -24,10 +24,10 @@ services:
         required: true
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SERVER_PORT: "8080"
+      SERVER_PORT: "8089"
       RAG_STORAGE_ROOT: /app/uploads
     ports:
-      - "${BACKEND_PORT:-8089}:8080"
+      - "${BACKEND_PORT:-8089}:8089"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
