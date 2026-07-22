@@ -29,6 +29,8 @@ adapter -> application -> domain <- infrastructure
 | `RAG_RERANK_ENABLED`        | 是否启用候选结果重排       | `true`                                           |
 | `RAG_RERANK_MODEL`          | 重排模型               | `qwen3-rerank`                                   |
 | `RAG_RERANK_TIMEOUT`        | 重排请求超时             | `5s`                                             |
+| `RAG_EVALUATION_JUDGE_MODEL` | 生成质量评估模型          | `deepseek-v4-flash`                              |
+| `RAG_EVALUATION_PIPELINE_VERSION` | 检索与 Prompt 组合版本 | `v1`                                             |
 | `AI_INTERACTION_LOG_LEVEL`  | ChatClient 交互日志级别 | `DEBUG`                                          |
 | `RAG_STORAGE_ROOT`          | 文件上传根目录           | `/Users/zhangzhewen/data/ragdemo/uploads`        |
 
@@ -52,19 +54,19 @@ cd rag-demo-backend
 当前工程使用 `maven.compiler.release=25`。更高版本 JDK 可用于兼容编译验证，但正式开发和验收应使用设计指定的
 JDK 25。
 
-首次启动时 Flyway 创建 7 张业务表，并初始化两个角色、两个测试用户和两条知识库数据。Redis Vector Store
-使用索引 `rag-demo-index`、Key 前缀 `rag:chunk:`、HNSW/COSINE 和 2560 维向量。
+首次启动时 Flyway 创建业务表，并初始化两个角色、两个测试用户和两条知识库数据。Redis Vector Store
+使用索引 `rag-demo-index-v2`、Key 前缀 `rag:chunk:`、HNSW/COSINE 和 2560 维向量。
 
 上传文件保存到 `{RAG_STORAGE_ROOT}/{knowledgeBaseId}/{uuid}.{ext}`。支持 `txt`、`md`、`pdf`、`doc`、
 `docx`，单文件不超过 20 MB。
 
 ## 模型与检索
 
-- Chat：`qwen3.7-plus`。
+- Chat：`deepseek-v4-flash`。
 - Embedding：`qwen3.7-text-embedding`，固定 2560 维。
 - 检索：Redis BM25 关键词检索与向量语义检索先通过 Reciprocal Rank Fusion 融合，再由
   `qwen3-rerank` 对候选切片二次打分。
-- 默认召回 20 条候选、重排后输出 Top-6，向量相似度阈值为 0.2；可通过 `RAG_CANDIDATE_TOP_K`、
+- 默认召回 20 条候选、重排后输出 Top-10，向量相似度阈值为 0.2；可通过 `RAG_CANDIDATE_TOP_K`、
   `RAG_TOP_K`、`RAG_SIMILARITY_THRESHOLD` 调整。
 - 重排超时、限流或响应无效时回退到 RRF 顺序，不中断问答。引用中的 `similarityScore` 保留初始检索分数，
   `rerankScore` 为本次候选集内的相对重排分数；未重排或回退时后者为 `null`。
@@ -78,4 +80,24 @@ JDK 25。
 日志按现有配置写入 `log/main.log`。这些内容可能包含用户问题、历史对话和知识库切片，不需要调试时应将
 `AI_INTERACTION_LOG_LEVEL` 设为 `INFO`。Advisor 不记录 API Key 或 HTTP Authorization 请求头。
 
-模型或维度改变后必须删除并重建整个 `rag-demo-index`，不能混用不同维度。
+模型或维度改变后必须删除并重建整个 `rag-demo-index-v2`，不能混用不同维度。
+
+## RAG 评估
+
+管理员可通过 `/api/admin/evaluations` 维护不可变的版本化评估集，并异步回放与在线问答相同的查询改写、
+查询扩展、混合召回、RRF、重排、上下文组装和生成链路。非拒答样本使用 `sourceName + evidenceContains`
+标注一条或多条黄金证据；`REFUSAL` 样本不配置黄金证据。支持的答案类型为 `FACTUAL`、`PROCEDURE`、
+`COMPARISON`、`REFUSAL`、`SUMMARY`。
+
+主要接口：
+
+- `POST /api/admin/evaluations/datasets`：创建新版本评估集，单个版本最多 100 条样本。
+- `GET /api/admin/evaluations/datasets`、`GET /api/admin/evaluations/datasets/{id}`：查询评估集。
+- `POST /api/admin/evaluations/datasets/{id}/runs`：启动异步评估；同一评估集同一时间只允许一个运行。
+- `GET /api/admin/evaluations/datasets/{id}/runs`、`GET /api/admin/evaluations/runs/{id}`：查询汇总和逐题轨迹。
+- `PUT /api/admin/evaluations/results/{id}/review`：提交 `ACCURATE` 或 `INACCURATE` 人工复核结论与备注。
+
+报告分别保存候选 `Hit Rate@K`、`MRR`，最终上下文 `Context Recall`、`Context Precision`，以及 Judge
+给出的 `Faithfulness`、`Answer Relevancy`、证据支撑准确率；拒答样本单独计算无答案准确率。运行还记录
+逐题与 P95 延迟、Prompt/Completion Token、完整检索轨迹和配置版本快照。默认通过规则为绝对门槛加
+最近一次通过运行的基线比较，所有门槛均可通过 `RAG_EVALUATION_*` 环境变量调整。

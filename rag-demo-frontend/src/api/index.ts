@@ -1,5 +1,16 @@
 import {api, http} from './http'
-import type {ApiResponse, Conversation, DocumentTask, KnowledgeBase, Message, User} from '@/types'
+import type {
+  ApiResponse,
+  Conversation,
+  CreateEvaluationDataset,
+  DocumentTask,
+  EvaluationDataset,
+  EvaluationReviewVerdict,
+  EvaluationRun,
+  KnowledgeBase,
+  Message,
+  User
+} from '@/types'
 
 export const authApi = {
   login: (username: string, password: string) => api(http.post<ApiResponse<{
@@ -59,4 +70,24 @@ export const adminApi = {
   },
   retry: (id: number) => api(http.post<ApiResponse<unknown>>(`/admin/documents/${id}/retry`)),
   removeDocument: (id: number) => api(http.delete<ApiResponse<unknown>>(`/admin/documents/${id}`))
+}
+
+export const evaluationApi = {
+  datasets: (knowledgeBaseId?: number) => api(http.get<ApiResponse<EvaluationDataset[]>>(
+    '/admin/evaluations/datasets', {params: {knowledgeBaseId}}
+  )),
+  dataset: (id: number) => api(http.get<ApiResponse<EvaluationDataset>>(`/admin/evaluations/datasets/${id}`)),
+  createDataset: (data: CreateEvaluationDataset) => api(http.post<ApiResponse<{ id: number }>>(
+    '/admin/evaluations/datasets', data
+  )),
+  runs: (datasetId: number) => api(http.get<ApiResponse<EvaluationRun[]>>(
+    `/admin/evaluations/datasets/${datasetId}/runs`
+  )),
+  startRun: (datasetId: number) => api(http.post<ApiResponse<{ id: number }>>(
+    `/admin/evaluations/datasets/${datasetId}/runs`
+  )),
+  run: (id: number) => api(http.get<ApiResponse<EvaluationRun>>(`/admin/evaluations/runs/${id}`)),
+  review: (resultId: number, verdict: EvaluationReviewVerdict, comment: string) => api(
+    http.put<ApiResponse<unknown>>(`/admin/evaluations/results/${resultId}/review`, {verdict, comment})
+  )
 }

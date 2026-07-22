@@ -22,6 +22,7 @@ async function logout() {
           <el-menu-item index="/admin/dashboard">数据看板</el-menu-item>
           <el-menu-item index="/admin/knowledge-bases">知识库管理</el-menu-item>
           <el-menu-item index="/admin/documents">文档管理</el-menu-item>
+          <el-menu-item index="/admin/evaluations">RAG 评估</el-menu-item>
           <el-menu-item index="/admin/users">用户管理</el-menu-item>
         </template>
       </el-menu>

@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "rag")
 public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Context context,
-                            Reranking reranking, Ingestion ingestion) {
+                            Reranking reranking, Ingestion ingestion, Evaluation evaluation) {
 
   /**
    * JWT 配置。
@@ -45,6 +45,17 @@ public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Co
    * 入库配置。
    */
   public record Ingestion(int chunkSize, int chunkOverlap, int embeddingBatchSize) {
+
+  }
+
+  /**
+   * 全链路评估 Judge 与质量门槛。
+   */
+  public record Evaluation(String pipelineVersion, String judgeModel,
+                           double candidateHitRate, double candidateMrr,
+                           double contextRecall, double contextPrecision, double faithfulness,
+                           double answerRelevancy, double evidenceSupportAccuracy,
+                           double noAnswerAccuracy, double maxRegression) {
 
   }
 }

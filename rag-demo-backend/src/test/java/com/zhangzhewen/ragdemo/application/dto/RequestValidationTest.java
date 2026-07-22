@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.Set;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -42,5 +43,21 @@ class RequestValidationTest {
     var request = new KnowledgeDtos.RenameRequest(" ");
     assertThat(validator.validate(request)).extracting(v -> v.getMessage())
         .contains("请输入会话标题");
+  }
+
+  /**
+   * 评估集至少包含一个问题并校验嵌套黄金证据。
+   */
+  @Test
+  void validatesEvaluationDataset() {
+    var empty = new EvaluationDtos.CreateDatasetRequest(1L, "评估集", "v1", List.of());
+    var invalidContext = new EvaluationDtos.CreateDatasetRequest(1L, "评估集", "v1", List.of(
+        new EvaluationDtos.CaseRequest("问题", "答案", "FACTUAL", false, List.of(
+            new EvaluationDtos.ExpectedContextRequest("", "")))));
+
+    assertThat(validator.validate(empty)).extracting(v -> v.getMessage())
+        .contains("评估集至少包含一条样本");
+    assertThat(validator.validate(invalidContext)).extracting(v -> v.getMessage())
+        .contains("请输入证据来源", "请输入黄金证据片段");
   }
 }

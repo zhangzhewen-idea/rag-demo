@@ -24,4 +24,18 @@ public class AsyncConfig {
     executor.initialize();
     return executor;
   }
+
+  /**
+   * 评估运行独立线程池，避免长时间模型调用占用文档入库线程。
+   */
+  @Bean("evaluationTaskExecutor")
+  public Executor evaluationTaskExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(2);
+    executor.setQueueCapacity(20);
+    executor.setThreadNamePrefix("rag-evaluation-");
+    executor.initialize();
+    return executor;
+  }
 }

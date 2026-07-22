@@ -5,22 +5,16 @@ import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
 import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
 import com.zhangzhewen.ragdemo.domain.conversation.ConversationSummary;
+import com.zhangzhewen.ragdemo.domain.conversation.ConversationPrompt;
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
-import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
-import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
-import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalTrace;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ContextSummaryGateway;
-import com.zhangzhewen.ragdemo.domain.gateway.DocumentRerankGateway;
-import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
-import com.zhangzhewen.ragdemo.domain.gateway.QueryExpansionGateway;
-import com.zhangzhewen.ragdemo.domain.gateway.QueryRewriteGateway;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -34,36 +28,26 @@ import org.springframework.stereotype.Service;
 @Service
 public class ConversationService {
 
-  public static final String NO_EVIDENCE = "当前知识库中未找到可靠依据";
+  public static final String NO_EVIDENCE = ConversationPrompt.NO_EVIDENCE;
   private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
   private static final int MAX_SUMMARY_BATCHES = 20;
   private final ConversationGateway conversations;
-  private final DocumentSearchGateway search;
-  private final DocumentRerankGateway rerank;
+  private final EvidenceRetrievalService retrieval;
   private final AiGateway ai;
   private final KnowledgeGateway knowledge;
-  private final QueryRewriteGateway queryRewrite;
-  private final QueryExpansionGateway queryExpansion;
-  private final RetrievalPolicy policy;
   private final ContextSummaryGateway contextSummary;
   private final ContextAssemblyPolicy contextPolicy;
 
   /**
    * 注入用例依赖。
    */
-  public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
-      DocumentRerankGateway rerank, AiGateway ai, KnowledgeGateway knowledge,
-      QueryRewriteGateway queryRewrite, QueryExpansionGateway queryExpansion,
-      RetrievalPolicy policy, ContextSummaryGateway contextSummary,
+  public ConversationService(ConversationGateway conversations, EvidenceRetrievalService retrieval,
+      AiGateway ai, KnowledgeGateway knowledge, ContextSummaryGateway contextSummary,
       ContextAssemblyPolicy contextPolicy) {
     this.conversations = conversations;
-    this.search = search;
-    this.rerank = rerank;
+    this.retrieval = retrieval;
     this.ai = ai;
     this.knowledge = knowledge;
-    this.queryRewrite = queryRewrite;
-    this.queryExpansion = queryExpansion;
-    this.policy = policy;
     this.contextSummary = contextSummary;
     this.contextPolicy = contextPolicy;
   }
@@ -119,7 +103,9 @@ public class ConversationService {
     List<Message> history = prepared.messages();
     conversations.saveMessage(conversationId, "USER", question, "COMPLETED", null, null, null);
     long start = System.nanoTime();
-    List<RetrievedChunk> refs = retrieve(c.knowledgeBaseId(), question, prepared.summary(), history);
+    RetrievalTrace trace = retrieval.retrieve(c.knowledgeBaseId(), question, prepared.summary(),
+        history);
+    List<RetrievedChunk> refs = trace.finalEvidence();
     if (refs.isEmpty()) {
       delta.accept(NO_EVIDENCE);
       Long id = conversations.saveMessage(conversationId, "ASSISTANT", NO_EVIDENCE, "COMPLETED",
@@ -140,40 +126,6 @@ public class ConversationService {
       conversations.saveReferences(id, context.evidence());
       return new ChatResult(id, answer.toString(), context.evidence(), elapsed);
     });
-  }
-
-  private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question, String summary,
-      List<Message> history) {
-    String rewritten = queryRewrite.rewrite(contextualQuery(question, summary, history));
-    List<RetrievalQuery> plans = queryExpansion.plan(rewritten);
-    List<List<RetrievedChunk>> rankings = plans.stream()
-        .map(plan -> search.search(knowledgeBaseId, plan, policy.candidateTopK(),
-            policy.similarityThreshold()))
-        .toList();
-    List<RetrievedChunk> candidates = ReciprocalRankFusion.fuse(rankings, policy.candidateTopK());
-    if (candidates.isEmpty()) {
-      return candidates;
-    }
-    return rerank.rerank(rewritten, candidates, policy.topK());
-  }
-
-  private String contextualQuery(String question, String summary, List<Message> history) {
-    String normalized = normalize(question);
-    boolean refersToHistory = List.of("这", "那", "上述", "前面", "刚才", "其他", "除了", "它")
-        .stream().anyMatch(normalized::contains);
-    if (!refersToHistory) {
-      return question;
-    }
-    for (int i = history.size() - 1; i >= 0; i--) {
-      Message message = history.get(i);
-      if ("ASSISTANT".equals(message.role()) && !message.content().isBlank()) {
-        String context = message.content().length() > 600
-            ? message.content().substring(0, 600) : message.content();
-        String prefix = summary == null || summary.isBlank() ? "" : summary + "\n";
-        return prefix + context + "\n追问：" + question;
-      }
-    }
-    return summary == null || summary.isBlank() ? question : summary + "\n追问：" + question;
   }
 
   private PreparedHistory prepareHistory(Long conversationId) {
@@ -227,10 +179,6 @@ public class ConversationService {
         throughMessageId, summary.version() + 1);
     boolean saved = conversations.saveSummary(updated, summary.version());
     return new CompressionAttempt(saved ? updated : summary, saved, !saved);
-  }
-
-  private String normalize(String value) {
-    return value.toLowerCase(Locale.ROOT).replaceAll("[\\s，。！？、,.!?：:；;]", "");
   }
 
   private long elapsed(long start) {

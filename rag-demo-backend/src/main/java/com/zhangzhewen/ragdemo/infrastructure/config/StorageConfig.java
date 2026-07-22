@@ -2,6 +2,7 @@ package com.zhangzhewen.ragdemo.infrastructure.config;
 
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationPolicy;
 import com.zhangzhewen.ragdemo.domain.gateway.TokenEstimator;
 import com.zhangzhewen.ragdemo.domain.identity.AuthPolicy;
 import com.zhangzhewen.ragdemo.domain.identity.JwtPolicy;
@@ -43,6 +44,18 @@ public class StorageConfig {
   RetrievalPolicy retrievalPolicy(RagProperties properties) {
     return new RetrievalPolicy(properties.retrieval().topK(),
         properties.retrieval().candidateTopK(), properties.retrieval().similarityThreshold());
+  }
+
+  /**
+   * 暴露给评估应用服务的绝对门槛和基线回归策略。
+   */
+  @Bean
+  EvaluationPolicy evaluationPolicy(RagProperties properties) {
+    RagProperties.Evaluation evaluation = properties.evaluation();
+    return new EvaluationPolicy(evaluation.candidateHitRate(), evaluation.candidateMrr(),
+        evaluation.contextRecall(), evaluation.contextPrecision(), evaluation.faithfulness(),
+        evaluation.answerRelevancy(), evaluation.evidenceSupportAccuracy(),
+        evaluation.noAnswerAccuracy(), evaluation.maxRegression());
   }
 
   /**

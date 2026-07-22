@@ -61,3 +61,119 @@ export interface DocumentTask {
   failureStage?: string;
   failureReason?: string
 }
+
+export type EvaluationAnswerType = 'FACTUAL' | 'PROCEDURE' | 'COMPARISON' | 'REFUSAL' | 'SUMMARY'
+export type EvaluationReviewVerdict = 'ACCURATE' | 'INACCURATE'
+
+export interface ExpectedContext {
+  sourceName: string;
+  evidenceContains: string
+}
+
+export interface EvaluationCase {
+  id: number;
+  question: string;
+  goldenAnswer: string;
+  answerType: EvaluationAnswerType;
+  critical: boolean;
+  expectedContexts: ExpectedContext[]
+}
+
+export interface EvaluationDataset {
+  id: number;
+  knowledgeBaseId: number;
+  name: string;
+  version: string;
+  caseCount: number;
+  createdBy: number;
+  createdAt: string;
+  cases: EvaluationCase[]
+}
+
+export interface EvaluationScores {
+  candidateHitRate?: number;
+  candidateMrr?: number;
+  contextRecall?: number;
+  contextPrecision?: number;
+  faithfulness: number;
+  answerRelevancy: number;
+  evidenceSupportAccuracy: number;
+  noAnswerAccuracy?: number
+}
+
+export interface RetrievalQuery {
+  query: string;
+  weight: number
+}
+
+export interface RetrievedChunk {
+  documentId: number;
+  sourceName: string;
+  chunkIndex: number;
+  excerpt: string;
+  similarityScore: number;
+  pageNumber?: number;
+  sectionTitle?: string
+}
+
+export interface EvaluationExecution {
+  caseId: number;
+  answer?: string;
+  rewrittenQuery?: string;
+  expandedQueries: RetrievalQuery[];
+  candidates: RetrievedChunk[];
+  finalEvidence: RetrievedChunk[];
+  scores?: EvaluationScores;
+  judgeRationale?: string;
+  promptTokens: number;
+  completionTokens: number;
+  latencyMs: number;
+  errorMessage?: string
+}
+
+export interface EvaluationCaseResult {
+  id: number;
+  runId: number;
+  evaluationCase: EvaluationCase;
+  execution: EvaluationExecution;
+  passed?: boolean;
+  reviewVerdict?: EvaluationReviewVerdict;
+  reviewComment?: string;
+  reviewedBy?: number;
+  reviewedAt?: string
+}
+
+export interface EvaluationRun {
+  id: number;
+  datasetId: number;
+  baselineRunId?: number;
+  status: string;
+  configSnapshot: string;
+  scores?: EvaluationScores;
+  passed: boolean;
+  totalCases: number;
+  completedCases: number;
+  failedCases: number;
+  promptTokens: number;
+  completionTokens: number;
+  latencyMs: number;
+  p95LatencyMs: number;
+  errorMessage?: string;
+  triggeredBy: number;
+  startedAt?: string;
+  completedAt?: string;
+  results: EvaluationCaseResult[]
+}
+
+export interface CreateEvaluationDataset {
+  knowledgeBaseId: number;
+  name: string;
+  version: string;
+  cases: Array<{
+    question: string;
+    goldenAnswer: string;
+    answerType: EvaluationAnswerType;
+    critical: boolean;
+    expectedContexts: ExpectedContext[]
+  }>
+}

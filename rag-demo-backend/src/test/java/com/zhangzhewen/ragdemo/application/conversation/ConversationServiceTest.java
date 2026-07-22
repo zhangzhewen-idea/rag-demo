@@ -257,10 +257,11 @@ class ConversationServiceTest {
     private final QueryExpansionGateway queryExpansion = mock(QueryExpansionGateway.class);
     private final ContextSummaryGateway contextSummary = mock(ContextSummaryGateway.class);
     private final TokenEstimator tokens = new TestTokenEstimator();
-    private final ConversationService service = new ConversationService(conversations, search,
-        rerank, ai, knowledge, queryRewrite, queryExpansion, new RetrievalPolicy(6, 20, .6),
-        contextSummary, new ContextAssemblyPolicy(24000, 4000, 4, 8000, 1200, 8000,
-        tokens));
+    private final EvidenceRetrievalService retrieval = new EvidenceRetrievalService(search, rerank,
+        queryRewrite, queryExpansion, new RetrievalPolicy(6, 20, .6));
+    private final ConversationService service = new ConversationService(conversations, retrieval,
+        ai, knowledge, contextSummary,
+        new ContextAssemblyPolicy(24000, 4000, 4, 8000, 1200, 8000, tokens));
 
     private Fixture() {
       when(conversations.findConversationById(9L))

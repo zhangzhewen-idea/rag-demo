@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
  */
 public final class ConversationPrompt {
 
+  public static final String NO_EVIDENCE = "当前知识库中未找到可靠依据";
   public static final String SYSTEM =
       "你是企业知识库问答助手。只能依据 EVIDENCE 区中的资料回答；"
           + "CONVERSATION_SUMMARY 和 RECENT_MESSAGES 仅用于理解对话，不得作为事实依据。"

@@ -75,6 +75,18 @@ rag:
     chunk-size: 800
     chunk-overlap: 100
     embedding-batch-size: 20
+  evaluation:
+    pipeline-version: ${RAG_EVALUATION_PIPELINE_VERSION:v1}
+    judge-model: ${RAG_EVALUATION_JUDGE_MODEL:deepseek-v4-flash}
+    candidate-hit-rate: ${RAG_EVALUATION_CANDIDATE_HIT_RATE:0.9}
+    candidate-mrr: ${RAG_EVALUATION_CANDIDATE_MRR:0.7}
+    context-recall: ${RAG_EVALUATION_CONTEXT_RECALL:0.8}
+    context-precision: ${RAG_EVALUATION_CONTEXT_PRECISION:0.6}
+    faithfulness: ${RAG_EVALUATION_FAITHFULNESS:0.8}
+    answer-relevancy: ${RAG_EVALUATION_ANSWER_RELEVANCY:0.8}
+    evidence-support-accuracy: ${RAG_EVALUATION_EVIDENCE_SUPPORT_ACCURACY:0.8}
+    no-answer-accuracy: ${RAG_EVALUATION_NO_ANSWER_ACCURACY:0.9}
+    max-regression: ${RAG_EVALUATION_MAX_REGRESSION:0.03}
 
 management:
   endpoints:

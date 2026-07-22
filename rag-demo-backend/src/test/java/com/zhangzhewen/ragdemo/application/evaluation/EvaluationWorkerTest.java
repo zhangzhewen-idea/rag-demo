@@ -1,0 +1,82 @@
+package com.zhangzhewen.ragdemo.application.evaluation;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.zhangzhewen.ragdemo.application.conversation.EvidenceRetrievalService;
+import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
+import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
+import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalTrace;
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Dataset;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.EvaluationCase;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.ExpectedContext;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Judgment;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Run;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Scores;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationPolicy;
+import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.EvaluationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.EvaluationJudgeGateway;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.Test;
+
+/**
+ * 全链路评估运行编排测试。
+ */
+class EvaluationWorkerTest {
+
+  @Test
+  void persistsTraceScoresAndPassedRun() {
+    EvaluationGateway evaluations = mock(EvaluationGateway.class);
+    EvidenceRetrievalService retrieval = mock(EvidenceRetrievalService.class);
+    ContextAssemblyPolicy contextPolicy = mock(ContextAssemblyPolicy.class);
+    AiGateway ai = mock(AiGateway.class);
+    EvaluationJudgeGateway judge = mock(EvaluationJudgeGateway.class);
+    EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8, .9, .03);
+    EvaluationWorker worker = new EvaluationWorker(evaluations, retrieval, contextPolicy, ai,
+        judge, policy);
+    EvaluationCase evaluationCase = new EvaluationCase(11L, "年假几天", "十天", "FACTUAL",
+        true, List.of(new ExpectedContext("制度.md", "年假为十天")));
+    Dataset dataset = new Dataset(3L, 1L, "核心问题", "v1", 1, 9L,
+        LocalDateTime.now(), List.of(evaluationCase));
+    Run run = new Run(5L, 3L, null, "QUEUED", "{}", zeroScores(), false, 1, 0, 0,
+        0, 0, 0, 0, null, 9L, null, null, List.of());
+    RetrievedChunk chunk = new RetrievedChunk(1L, 2L, "制度.md", 0, .9,
+        "正式员工年假为十天", null, null);
+    RetrievalTrace trace = new RetrievalTrace("年假天数", List.of(new RetrievalQuery("年假天数",
+        "年假 天数")), List.of(chunk), List.of(chunk));
+    AnswerContext context = new AnswerContext("system", "user", List.of(chunk), 10, 100);
+    when(evaluations.findRun(5L)).thenReturn(Optional.of(run));
+    when(evaluations.findDataset(3L)).thenReturn(Optional.of(dataset));
+    when(retrieval.retrieve(1L, "年假几天", "", List.of())).thenReturn(trace);
+    when(contextPolicy.assemble("年假几天", "", List.of(), List.of(chunk))).thenReturn(context);
+    doAnswer(invocation -> {
+      Consumer<String> consumer = invocation.getArgument(1);
+      consumer.accept("年假为十天");
+      return new AiUsage(10, 5);
+    }).when(ai).streamAnswer(eq(context), any());
+    when(judge.judge("年假几天", "十天", "FACTUAL", "年假为十天", List.of(chunk)))
+        .thenReturn(new Judgment(.9, .9, .9, false, "证据充分"));
+
+    worker.process(5L);
+
+    verify(evaluations).saveCaseResult(eq(5L), eq(evaluationCase), any(), eq(true));
+    verify(evaluations).completeRun(eq(5L), eq("PASSED"), any(Scores.class), eq(true), eq(1),
+        eq(0), eq(10), eq(5), anyLong(), anyLong(), eq(null));
+  }
+
+  private Scores zeroScores() {
+    return new Scores(0D, 0D, 0D, 0D, 0D, 0D, 0D, 0D);
+  }
+}
