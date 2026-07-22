@@ -27,6 +27,8 @@ async function rename(item: Conversation) {
     const {value} = await ElMessageBox.prompt('输入新标题', '重命名', {
       inputValue: item.title,
       inputValidator: value => Boolean(value.trim()) || '请输入会话标题',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
     })
     await conversationApi.rename(item.id, value.trim())
     ElMessage.success('已重命名')
