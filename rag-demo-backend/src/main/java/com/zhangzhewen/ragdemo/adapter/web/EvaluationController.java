@@ -6,6 +6,7 @@ import com.zhangzhewen.ragdemo.application.dto.EvaluationDtos.ReviewRequest;
 import com.zhangzhewen.ragdemo.application.evaluation.EvaluationService;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Dataset;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Run;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationPolicy;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,11 @@ public class EvaluationController {
 
   public EvaluationController(EvaluationService evaluations) {
     this.evaluations = evaluations;
+  }
+
+  @GetMapping("/thresholds")
+  public ApiResponse<EvaluationPolicy> thresholds() {
+    return WebSupport.ok(evaluations.thresholds());
   }
 
   @PostMapping("/datasets")

@@ -7,6 +7,7 @@ import type {
   EvaluationDataset,
   EvaluationReviewVerdict,
   EvaluationRun,
+  EvaluationThresholds,
   KnowledgeBase,
   Message,
   User
@@ -73,6 +74,9 @@ export const adminApi = {
 }
 
 export const evaluationApi = {
+  thresholds: () => api(http.get<ApiResponse<EvaluationThresholds>>(
+    '/admin/evaluations/thresholds'
+  )),
   datasets: (knowledgeBaseId?: number) => api(http.get<ApiResponse<EvaluationDataset[]>>(
     '/admin/evaluations/datasets', {params: {knowledgeBaseId}}
   )),

@@ -7,6 +7,7 @@ import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Dataset;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.EvaluationCase;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.ExpectedContext;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Run;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationPolicy;
 import com.zhangzhewen.ragdemo.domain.gateway.EvaluationConfigurationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.EvaluationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
@@ -30,14 +31,23 @@ public class EvaluationService {
   private final EvaluationConfigurationGateway configuration;
   private final KnowledgeGateway knowledge;
   private final EvaluationWorker worker;
+  private final EvaluationPolicy policy;
 
   public EvaluationService(EvaluationGateway evaluations,
       EvaluationConfigurationGateway configuration, KnowledgeGateway knowledge,
-      EvaluationWorker worker) {
+      EvaluationWorker worker, EvaluationPolicy policy) {
     this.evaluations = evaluations;
     this.configuration = configuration;
     this.knowledge = knowledge;
     this.worker = worker;
+    this.policy = policy;
+  }
+
+  /**
+   * 查询当前生效的质量门槛，供评估报告统一解释通过与未通过指标。
+   */
+  public EvaluationPolicy thresholds() {
+    return policy;
   }
 
   public Long createDataset(CreateDatasetRequest request, Long userId) {

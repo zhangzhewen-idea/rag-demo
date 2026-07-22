@@ -4,11 +4,14 @@ import {ElMessage, type FormInstance, type FormRules} from 'element-plus'
 import {adminApi, evaluationApi} from '@/api'
 import type {
   CreateEvaluationDataset,
+  DocumentTask,
   EvaluationAnswerType,
   EvaluationCaseResult,
   EvaluationDataset,
   EvaluationReviewVerdict,
   EvaluationRun,
+  EvaluationScores,
+  EvaluationThresholds,
   KnowledgeBase
 } from '@/types'
 
@@ -24,6 +27,44 @@ const ANSWER_TYPES: Array<{ label: string; value: EvaluationAnswerType }> = [
 const STATUS_TEXT: Record<string, string> = {
   QUEUED: '排队中', RUNNING: '评估中', PASSED: '已通过', FAILED: '未通过', ERROR: '异常'
 }
+const METRIC_DEFINITIONS: Array<{
+  key: keyof EvaluationScores;
+  label: string;
+  description: string
+}> = [
+  {
+    key: 'candidateHitRate', label: '候选命中率',
+    description: '重排前的候选列表中，至少出现一条黄金证据的样本比例。它判断“有没有找到”，不判断是否找全。'
+  },
+  {
+    key: 'candidateMrr', label: '候选 MRR',
+    description: '每条样本首个正确候选排名倒数的平均值。正确证据越靠前，分数越高；第 1 名为 100%，第 4 名为 25%。'
+  },
+  {
+    key: 'contextRecall', label: '上下文召回率',
+    description: '重排后的最终上下文覆盖了多少黄金证据，用于判断应该提供给模型的证据是否找全。'
+  },
+  {
+    key: 'contextPrecision', label: '上下文精确率',
+    description: '最终上下文中命中黄金证据的切片占比，用于衡量交给模型的上下文中有多少是有效证据。'
+  },
+  {
+    key: 'faithfulness', label: '忠实度',
+    description: '由独立 Judge 判断回答中的事实是否都能由最终证据支撑，主要用于发现脱离证据的内容。'
+  },
+  {
+    key: 'answerRelevancy', label: '答案相关性',
+    description: '由独立 Judge 判断回答是否直接、完整地回应问题，并符合事实问答、步骤、比较或拒答等答案类型。'
+  },
+  {
+    key: 'evidenceSupportAccuracy', label: '证据支持准确率',
+    description: '由独立 Judge 判断系统关联的证据是否确实支持回答中的结论，主要用于发现错引或证据不匹配。'
+  },
+  {
+    key: 'noAnswerAccuracy', label: '拒答准确率',
+    description: '仅统计无黄金证据的拒答样本；最终没有召回证据记为正确，仍返回证据记为错误。没有拒答样本时显示不适用。'
+  },
+]
 
 const knowledge = ref<KnowledgeBase[]>([])
 const selectedKnowledgeBaseId = ref<number>()
@@ -31,10 +72,13 @@ const datasets = ref<EvaluationDataset[]>([])
 const selectedDataset = ref<EvaluationDataset>()
 const runs = ref<EvaluationRun[]>([])
 const selectedRun = ref<EvaluationRun>()
+const thresholds = ref<EvaluationThresholds>()
 const loading = ref(false)
 const runLoading = ref(false)
 const starting = ref(false)
 const createVisible = ref(false)
+const formDocuments = ref<DocumentTask[]>([])
+const formDocumentsLoading = ref(false)
 const reviewVisible = ref(false)
 const createFormRef = ref<FormInstance>()
 const reviewingResult = ref<EvaluationCaseResult>()
@@ -61,22 +105,53 @@ const completedPercent = computed(() => {
   if (!run?.totalCases) return 0
   return Math.round(run.completedCases / run.totalCases * 100)
 })
+const baselineScores = computed(() => {
+  const baselineId = selectedRun.value?.baselineRunId
+  return baselineId ? runs.value.find(run => run.id === baselineId)?.scores : undefined
+})
 const metrics = computed(() => {
   const scores = selectedRun.value?.scores
   if (!scores) return []
-  return [
-    ['候选命中率', scores.candidateHitRate],
-    ['候选 MRR', scores.candidateMrr],
-    ['上下文召回率', scores.contextRecall],
-    ['上下文精确率', scores.contextPrecision],
-    ['忠实度', scores.faithfulness],
-    ['答案相关性', scores.answerRelevancy],
-    ['证据支持准确率', scores.evidenceSupportAccuracy],
-    ['拒答准确率', scores.noAnswerAccuracy],
-  ]
+  return METRIC_DEFINITIONS.map(definition => {
+    const value = scores[definition.key]
+    const threshold = thresholds.value?.[definition.key]
+    const baseline = baselineScores.value?.[definition.key]
+    if (value == null || threshold == null) {
+      return {...definition, value, threshold, baseline, state: 'not-applicable' as const, reason: ''}
+    }
+    const belowThreshold = value < threshold
+    const regressed = baseline != null && thresholds.value != null
+      && value + thresholds.value.maxRegression < baseline
+    const reason = belowThreshold
+      ? `低于合格门槛 ${percent(threshold)}`
+      : regressed ? `较基线下降超过 ${percent(thresholds.value!.maxRegression)}` : ''
+    return {
+      ...definition, value, threshold, baseline,
+      state: belowThreshold || regressed ? 'failed' as const : 'passed' as const,
+      reason,
+    }
+  })
+})
+const failedMetrics = computed(() => metrics.value.filter(metric => metric.state === 'failed'))
+const failureSummary = computed(() => {
+  const reasons: string[] = []
+  if (failedMetrics.value.length) {
+    reasons.push(`未通过指标：${failedMetrics.value.map(metric => `${metric.label}（${metric.reason}）`).join('、')}`)
+  }
+  const criticalCases = selectedRun.value?.results.filter(
+    result => result.evaluationCase.critical && !result.passed
+  ).length ?? 0
+  if (criticalCases) reasons.push(`${criticalCases} 条关键样本未通过`)
+  if (selectedRun.value?.failedCases) reasons.push(`${selectedRun.value.failedCases} 条样本执行失败`)
+  return reasons.join('；') || '未发现低于绝对门槛的指标，请检查样本结果或相对基线变化。'
 })
 
 onMounted(async () => {
+  try {
+    thresholds.value = await evaluationApi.thresholds()
+  } catch (error) {
+    ElMessage.error(`评估门槛加载失败：${(error as Error).message}`)
+  }
   try {
     knowledge.value = await adminApi.knowledge()
     selectedKnowledgeBaseId.value = knowledge.value[0]?.id
@@ -147,12 +222,37 @@ async function loadRuns(datasetId: number, showLoading = true) {
   }
 }
 
-function openCreate() {
+async function openCreate() {
   Object.assign(form, {
     knowledgeBaseId: selectedKnowledgeBaseId.value ?? knowledge.value[0]?.id ?? 0,
     name: '', version: 'v1', cases: [newCase()]
   })
   createVisible.value = true
+  await loadFormDocuments(form.knowledgeBaseId)
+}
+
+async function loadFormDocuments(knowledgeBaseId: number) {
+  formDocuments.value = []
+  if (!knowledgeBaseId) return
+  formDocumentsLoading.value = true
+  try {
+    formDocuments.value = await adminApi.documents(knowledgeBaseId)
+  } catch (error) {
+    ElMessage.error(`知识库文档加载失败：${(error as Error).message}`)
+  } finally {
+    formDocumentsLoading.value = false
+  }
+}
+
+async function changeFormKnowledgeBase(knowledgeBaseId: number) {
+  form.cases.forEach(item => item.expectedContexts.forEach(evidence => {
+    evidence.sourceName = ''
+  }))
+  await loadFormDocuments(knowledgeBaseId)
+}
+
+function documentOptionLabel(document: DocumentTask) {
+  return document.status === 'READY' ? document.originalName : `${document.originalName}（未完成入库）`
 }
 
 function changeAnswerType(index: number) {
@@ -313,10 +413,29 @@ function statusType(status: string) {
 
       <el-progress v-if="ACTIVE_RUN_STATUSES.has(selectedRun.status)" :percentage="completedPercent" :stroke-width="12"/>
       <el-alert v-if="selectedRun.errorMessage" type="error" :title="selectedRun.errorMessage" show-icon :closable="false"/>
+      <el-alert v-if="selectedRun.status === 'FAILED'" class="failure-summary" type="error"
+                title="质量门禁未通过" :description="failureSummary" show-icon :closable="false"/>
 
       <div v-if="metrics.length" class="evaluation-metrics">
-        <article v-for="metric in metrics" :key="metric[0]">
-          <span>{{ metric[0] }}</span><b>{{ percent(metric[1] as number | undefined) }}</b>
+        <article v-for="metric in metrics" :key="metric.key" :data-metric="metric.key"
+                 :class="['metric-card', `metric-${metric.state}`]">
+          <div class="metric-head">
+            <span>{{ metric.label }}</span>
+            <el-popover trigger="click" placement="top" :width="320">
+              <template #reference>
+                <button type="button" class="metric-help" :aria-label="`查看${metric.label}说明`">?</button>
+              </template>
+              <strong>{{ metric.label }}</strong>
+              <p class="metric-description">{{ metric.description }}</p>
+              <small v-if="metric.threshold != null">当前合格门槛：{{ percent(metric.threshold) }}</small>
+            </el-popover>
+          </div>
+          <b>{{ percent(metric.value) }}</b>
+          <div class="metric-verdict">
+            <span v-if="metric.state === 'not-applicable'">不适用</span>
+            <span v-else-if="metric.state === 'passed'">已通过 · 门槛 {{ percent(metric.threshold) }}</span>
+            <span v-else>未通过 · {{ metric.reason }}</span>
+          </div>
         </article>
       </div>
       <div class="run-meta">
@@ -373,7 +492,7 @@ function statusType(status: string) {
     <el-dialog v-model="createVisible" title="新建评估集" width="880px" top="4vh">
       <el-form ref="createFormRef" :model="form" :rules="rules" label-position="top">
         <div class="form-grid">
-          <el-form-item label="知识库" prop="knowledgeBaseId"><el-select v-model="form.knowledgeBaseId" class="wide"><el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id"/></el-select></el-form-item>
+          <el-form-item label="知识库" prop="knowledgeBaseId"><el-select v-model="form.knowledgeBaseId" class="wide" @change="changeFormKnowledgeBase"><el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id"/></el-select></el-form-item>
           <el-form-item label="评估集名称" prop="name"><el-input v-model="form.name" maxlength="128"/></el-form-item>
           <el-form-item label="版本" prop="version"><el-input v-model="form.version" maxlength="64"/></el-form-item>
         </div>
@@ -389,7 +508,13 @@ function statusType(status: string) {
           <template v-if="item.answerType !== 'REFUSAL'">
             <div class="evidence-title"><b>黄金证据</b><el-button text type="primary" @click="item.expectedContexts.push({sourceName: '', evidenceContains: ''})">添加证据</el-button></div>
             <div v-for="(evidence, evidenceIndex) in item.expectedContexts" :key="evidenceIndex" class="evidence-form">
-              <el-input v-model="evidence.sourceName" placeholder="来源文件名" maxlength="255"/>
+              <el-select v-model="evidence.sourceName" data-testid="source-document-select"
+                         filterable :loading="formDocumentsLoading"
+                         placeholder="选择当前知识库文档" empty-text="当前知识库暂无文档">
+                <el-option v-for="document in formDocuments" :key="document.id"
+                           :label="documentOptionLabel(document)" :value="document.originalName"
+                           :disabled="document.status !== 'READY'"/>
+              </el-select>
               <el-input v-model="evidence.evidenceContains" placeholder="证据中必须包含的文本" maxlength="1000"/>
               <el-button :disabled="item.expectedContexts.length === 1" text type="danger" @click="item.expectedContexts.splice(evidenceIndex, 1)">移除</el-button>
             </div>
@@ -413,4 +538,76 @@ function statusType(status: string) {
 
 <style scoped>
 .evaluation-layout{display:grid;grid-template-columns:320px 1fr;gap:18px}.panel,.run-detail{background:rgba(255,255,255,.88);border:1px solid #fff;border-radius:20px;box-shadow:0 10px 35px rgba(65,45,112,.07)}.panel{padding:20px;min-height:330px}.panel-head,.detail-head,.run-summary,.sample-title,.samples-head,.evidence-title,.review-row{display:flex;align-items:center;justify-content:space-between}.panel-head{margin-bottom:14px}.panel-head h2,.detail-head h2{margin:0}.panel-head span{color:#746d7d;font-size:13px}.dataset-panel{display:flex;flex-direction:column;gap:8px}.dataset-item{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border:1px solid #ece7f7;border-radius:13px;background:#fff;color:inherit;text-align:left;cursor:pointer}.dataset-item:hover,.dataset-item.active{border-color:#8a69ef;background:#f4f0ff}.dataset-item>span{display:flex;align-items:center;gap:8px;color:#676071}.dataset-item small{color:#8a8491}.runs-panel .el-table{cursor:pointer}.run-detail{padding:26px;margin-top:20px}.run-summary{gap:12px}.evaluation-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}.evaluation-metrics article{padding:17px;border:1px solid #eee9f7;border-radius:14px;background:#faf9fe}.evaluation-metrics span{color:#6f6879;font-size:13px}.evaluation-metrics b{display:block;margin-top:8px;font-size:24px}.run-meta,.case-score-row{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0;color:#6d6677}.case-results{border-top:1px solid #ece7f5}.case-title{display:flex;align-items:center;gap:10px;min-width:0}.case-title b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.case-body{padding:4px 18px 18px}.answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.answer-grid article,.judge,.evidence-card{padding:14px;border-radius:12px;background:#f8f6fc}.answer-grid h4{margin:0 0 8px}.answer-grid p,.judge,.evidence-card p{white-space:pre-wrap;line-height:1.65;margin:0}.case-score-row span{padding:6px 10px;border-radius:999px;background:#f0ecfa;font-size:12px}.evidence-card{margin-bottom:8px}.evidence-card small{display:block;color:#787180;margin:5px 0}.review-row{margin-top:15px}.reviewed,.pass-text{color:#219168}.fail-text{color:#d04a5d}.form-grid{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:14px}.samples-head{margin:10px 0}.samples-head h3{margin:0}.samples-head span{color:#837c8b;font-size:13px}.sample-card{padding:18px;margin-bottom:14px;border:1px solid #e9e3f5;border-radius:15px;background:#fbfaff}.sample-title{margin-bottom:10px}.sample-options{display:grid;grid-template-columns:1fr 1fr;gap:16px}.evidence-title{margin-bottom:9px}.evidence-form{display:grid;grid-template-columns:210px 1fr auto;gap:8px;margin-bottom:8px}@media(max-width:1180px){.evaluation-layout{grid-template-columns:280px 1fr}.evaluation-metrics{grid-template-columns:repeat(2,1fr)}}
+
+.failure-summary {
+  margin-top: 16px;
+}
+
+.metric-card {
+  transition: border-color .2s, background-color .2s, box-shadow .2s;
+}
+
+.metric-card.metric-passed {
+  border-color: #b8e5d0;
+  background: #f2fbf6;
+  box-shadow: inset 0 0 0 1px #dff3e8;
+}
+
+.metric-card.metric-failed {
+  border-color: #f0bdc4;
+  background: #fff5f6;
+  box-shadow: inset 0 0 0 1px #f9dfe3;
+}
+
+.metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.metric-help {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #cfc7e2;
+  border-radius: 50%;
+  color: #766b86;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metric-help:hover {
+  border-color: #7652ee;
+  color: #6540e3;
+}
+
+.evaluation-metrics .metric-passed > b,
+.evaluation-metrics .metric-passed .metric-verdict span {
+  color: #16815b;
+}
+
+.evaluation-metrics .metric-failed > b,
+.evaluation-metrics .metric-failed .metric-verdict span {
+  color: #c43f52;
+}
+
+.metric-verdict {
+  min-height: 20px;
+  margin-top: 6px;
+}
+
+.evaluation-metrics .metric-verdict span {
+  font-size: 12px;
+}
+
+.metric-description {
+  margin: 8px 0;
+  color: #554e61;
+  line-height: 1.65;
+}
 </style>

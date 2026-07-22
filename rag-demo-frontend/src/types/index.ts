@@ -101,6 +101,18 @@ export interface EvaluationScores {
   noAnswerAccuracy?: number
 }
 
+export interface EvaluationThresholds {
+  candidateHitRate: number;
+  candidateMrr: number;
+  contextRecall: number;
+  contextPrecision: number;
+  faithfulness: number;
+  answerRelevancy: number;
+  evidenceSupportAccuracy: number;
+  noAnswerAccuracy: number;
+  maxRegression: number
+}
+
 export interface RetrievalQuery {
   query: string;
   weight: number

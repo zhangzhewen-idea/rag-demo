@@ -4,8 +4,9 @@ import ElementPlus from 'element-plus'
 import EvaluationView from './EvaluationView.vue'
 
 const {adminApi, evaluationApi} = vi.hoisted(() => ({
-  adminApi: {knowledge: vi.fn()},
+  adminApi: {knowledge: vi.fn(), documents: vi.fn()},
   evaluationApi: {
+    thresholds: vi.fn(),
     datasets: vi.fn(),
     runs: vi.fn(),
     run: vi.fn(),
@@ -31,7 +32,28 @@ class ResizeObserverStub {
 describe('RAG 评估页面', () => {
   beforeEach(() => {
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    evaluationApi.thresholds.mockResolvedValue({
+      candidateHitRate: .9,
+      candidateMrr: .7,
+      contextRecall: .8,
+      contextPrecision: .6,
+      faithfulness: .8,
+      answerRelevancy: .8,
+      evidenceSupportAccuracy: .8,
+      noAnswerAccuracy: .9,
+      maxRegression: .03,
+    })
     adminApi.knowledge.mockResolvedValue([{id: 3, name: '技术规范', status: 'ENABLED'}])
+    adminApi.documents.mockResolvedValue([{
+      id: 21,
+      knowledgeBaseId: 3,
+      originalName: 'Java开发规范.md',
+      extension: 'md',
+      fileSize: 1024,
+      status: 'READY',
+      chunkCount: 3,
+      retryCount: 0,
+    }])
     evaluationApi.datasets.mockResolvedValue([{
       id: 8,
       knowledgeBaseId: 3,
@@ -80,7 +102,7 @@ describe('RAG 评估页面', () => {
 
   // Regression: ISSUE-003 — 后端 FAILED 终态被当作非终态，门禁结论显示为短横线
   // Found by /qa on 2026-07-22
-  it('正确显示未通过的运行终态和质量门禁结论', async () => {
+  it('显示未通过指标、门槛状态颜色和指标说明', async () => {
     const wrapper = mount(EvaluationView, {
       attachTo: document.body,
       global: {plugins: [ElementPlus]},
@@ -88,7 +110,31 @@ describe('RAG 评估页面', () => {
     await flushPromises()
 
     expect(document.body.textContent).toContain('质量门禁未通过')
-    expect(document.body.textContent).toContain('未通过')
+    expect(document.body.textContent).toContain('未通过指标：候选命中率')
+    expect(wrapper.get('[data-metric="candidateHitRate"]').classes()).toContain('metric-failed')
+    expect(wrapper.get('[data-metric="faithfulness"]').classes()).toContain('metric-passed')
+    expect(wrapper.get('[data-metric="noAnswerAccuracy"]').classes()).toContain('metric-not-applicable')
+
+    await wrapper.get('button[aria-label="查看候选命中率说明"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('重排前的候选列表中，至少出现一条黄金证据')
+    wrapper.unmount()
+  })
+
+  it('创建评估集时从当前知识库加载黄金证据文档', async () => {
+    const wrapper = mount(EvaluationView, {
+      attachTo: document.body,
+      global: {plugins: [ElementPlus]},
+    })
+    await flushPromises()
+
+    const createButton = wrapper.findAll('button').find(button => button.text().includes('新建评估集'))
+    expect(createButton).toBeDefined()
+    await createButton!.trigger('click')
+    await flushPromises()
+
+    expect(adminApi.documents).toHaveBeenCalledWith(3)
+    expect(document.body.querySelector('[data-testid="source-document-select"]')).not.toBeNull()
     wrapper.unmount()
   })
 })

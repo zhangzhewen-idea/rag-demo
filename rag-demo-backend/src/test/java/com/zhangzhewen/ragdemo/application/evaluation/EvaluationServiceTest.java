@@ -11,6 +11,7 @@ import com.zhangzhewen.ragdemo.application.dto.EvaluationDtos.CaseRequest;
 import com.zhangzhewen.ragdemo.application.dto.EvaluationDtos.CreateDatasetRequest;
 import com.zhangzhewen.ragdemo.application.dto.EvaluationDtos.ExpectedContextRequest;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationModels.Dataset;
+import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationPolicy;
 import com.zhangzhewen.ragdemo.domain.gateway.EvaluationConfigurationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.EvaluationGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
@@ -31,8 +32,15 @@ class EvaluationServiceTest {
       EvaluationConfigurationGateway.class);
   private final KnowledgeGateway knowledge = mock(KnowledgeGateway.class);
   private final EvaluationWorker worker = mock(EvaluationWorker.class);
+  private final EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8,
+      .9, .03);
   private final EvaluationService service = new EvaluationService(gateway, configuration,
-      knowledge, worker);
+      knowledge, worker, policy);
+
+  @Test
+  void exposesCurrentEvaluationThresholds() {
+    assertThat(service.thresholds()).isSameAs(policy);
+  }
 
   @Test
   void createsVersionedDatasetWithGoldenEvidence() {
