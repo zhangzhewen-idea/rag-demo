@@ -1,6 +1,8 @@
 package com.zhangzhewen.ragdemo.infrastructure.config;
 
+import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
+import com.zhangzhewen.ragdemo.domain.gateway.TokenEstimator;
 import com.zhangzhewen.ragdemo.domain.identity.AuthPolicy;
 import com.zhangzhewen.ragdemo.domain.identity.JwtPolicy;
 import com.zhangzhewen.ragdemo.domain.knowledge.IngestionPolicy;
@@ -41,6 +43,17 @@ public class StorageConfig {
   RetrievalPolicy retrievalPolicy(RagProperties properties) {
     return new RetrievalPolicy(properties.retrieval().topK(),
         properties.retrieval().candidateTopK(), properties.retrieval().similarityThreshold());
+  }
+
+  /**
+   * 暴露给会话应用服务的上下文预算策略。
+   */
+  @Bean
+  ContextAssemblyPolicy contextAssemblyPolicy(RagProperties properties, TokenEstimator tokens) {
+    RagProperties.Context context = properties.context();
+    return new ContextAssemblyPolicy(context.maxInputTokens(), context.reservedOutputTokens(),
+        context.recentTurns(), context.summaryTriggerTokens(), context.maxSummaryTokens(),
+        context.minEvidenceTokens(), tokens);
   }
 
   /**

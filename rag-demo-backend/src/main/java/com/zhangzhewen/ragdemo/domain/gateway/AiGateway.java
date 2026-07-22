@@ -1,8 +1,7 @@
 package com.zhangzhewen.ragdemo.domain.gateway;
 
-import com.zhangzhewen.ragdemo.domain.conversation.Message;
-import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
-import java.util.List;
+import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
+import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import java.util.function.Consumer;
 
 /**
@@ -13,6 +12,5 @@ public interface AiGateway {
   /**
    * 仅依据证据生成答案并逐段回调。
    */
-  void streamAnswer(String question, List<Message> history, List<RetrievedChunk> evidence,
-      Consumer<String> deltaConsumer);
+  AiUsage streamAnswer(AnswerContext context, Consumer<String> deltaConsumer);
 }

@@ -1,6 +1,7 @@
 package com.zhangzhewen.ragdemo.infrastructure.persistence;
 
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
+import com.zhangzhewen.ragdemo.domain.conversation.ConversationSummary;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
@@ -42,6 +43,10 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
 
   static final String REFERENCE_INSERT =
       "INSERT INTO ai_message_reference(message_id,knowledge_base_id,document_id,source_name,chunk_index,similarity_score,rerank_score,excerpt,page_number,section_title) VALUES(?,?,?,?,?,?,?,?,?,?)";
+  static final String SUMMARY_INSERT =
+      "INSERT IGNORE INTO ai_conversation_summary(conversation_id,summary,through_message_id,version) VALUES(?,?,?,1)";
+  static final String SUMMARY_UPDATE =
+      "UPDATE ai_conversation_summary SET summary=?,through_message_id=?,version=version+1 WHERE conversation_id=? AND version=? AND through_message_id<?";
   private final JdbcTemplate jdbc;
   private final SystemMetricsMapper metrics;
 
@@ -178,6 +183,11 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
   private static final RowMapper<Conversation> CONVERSATION_MAPPER = (rs, n) -> new Conversation(
       rs.getLong("id"), rs.getLong("user_id"), rs.getLong("knowledge_base_id"),
       rs.getString("title"), rs.getString("status"));
+  private static final RowMapper<Message> MESSAGE_MAPPER = (rs, n) -> new Message(
+      rs.getLong("id"), rs.getLong("conversation_id"), rs.getString("role"),
+      rs.getString("content"), rs.getString("status"),
+      (Integer) rs.getObject("prompt_tokens"), (Integer) rs.getObject("completion_tokens"),
+      (Long) rs.getObject("elapsed_ms"), rs.getTimestamp("created_at").toLocalDateTime());
 
   @Override
   public Long create(Long userId, Long knowledgeBaseId, String title) {
@@ -214,12 +224,34 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
   public List<Message> recentMessages(Long conversationId, int limit) {
     List<Message> messages = jdbc.query(
         "SELECT * FROM (SELECT id,conversation_id,role,content,status,prompt_tokens,completion_tokens,elapsed_ms,created_at FROM ai_message WHERE conversation_id=? ORDER BY id DESC LIMIT ?) x ORDER BY id",
-        (rs, n) -> new Message(rs.getLong("id"), rs.getLong("conversation_id"),
-            rs.getString("role"), rs.getString("content"), rs.getString("status"),
-            (Integer) rs.getObject("prompt_tokens"), (Integer) rs.getObject("completion_tokens"),
-            (Long) rs.getObject("elapsed_ms"), rs.getTimestamp("created_at").toLocalDateTime()),
-        conversationId, limit);
+        MESSAGE_MAPPER, conversationId, limit);
     return messages;
+  }
+
+  @Override
+  public List<Message> messagesAfter(Long conversationId, long messageId) {
+    return jdbc.query(
+        "SELECT id,conversation_id,role,content,status,prompt_tokens,completion_tokens,elapsed_ms,created_at FROM ai_message WHERE conversation_id=? AND id>? AND status='COMPLETED' ORDER BY id",
+        MESSAGE_MAPPER, conversationId, messageId);
+  }
+
+  @Override
+  public Optional<ConversationSummary> findSummary(Long conversationId) {
+    return jdbc.query(
+        "SELECT conversation_id,summary,through_message_id,version FROM ai_conversation_summary WHERE conversation_id=?",
+        (rs, n) -> new ConversationSummary(rs.getLong("conversation_id"),
+            rs.getString("summary"), rs.getLong("through_message_id"), rs.getLong("version")),
+        conversationId).stream().findFirst();
+  }
+
+  @Override
+  public boolean saveSummary(ConversationSummary summary, long expectedVersion) {
+    if (expectedVersion == 0L) {
+      return jdbc.update(SUMMARY_INSERT, summary.conversationId(), summary.content(),
+          summary.throughMessageId()) == 1;
+    }
+    return jdbc.update(SUMMARY_UPDATE, summary.content(), summary.throughMessageId(),
+        summary.conversationId(), expectedVersion, summary.throughMessageId()) == 1;
   }
 
   @Override

@@ -1,6 +1,7 @@
 package com.zhangzhewen.ragdemo.domain.gateway;
 
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
+import com.zhangzhewen.ragdemo.domain.conversation.ConversationSummary;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import java.util.List;
@@ -40,6 +41,21 @@ public interface ConversationGateway {
    * 查询最近消息。
    */
   List<Message> recentMessages(Long conversationId, int limit);
+
+  /**
+   * 查询摘要游标之后的全部已完成消息。
+   */
+  List<Message> messagesAfter(Long conversationId, long messageId);
+
+  /**
+   * 查询会话滚动摘要。
+   */
+  Optional<ConversationSummary> findSummary(Long conversationId);
+
+  /**
+   * 按版本乐观写入滚动摘要。
+   */
+  boolean saveSummary(ConversationSummary summary, long expectedVersion);
 
   /**
    * 保存消息。

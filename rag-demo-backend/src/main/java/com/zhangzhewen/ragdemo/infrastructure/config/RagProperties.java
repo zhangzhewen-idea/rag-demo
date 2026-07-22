@@ -7,8 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * RAG 业务配置。
  */
 @ConfigurationProperties(prefix = "rag")
-public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Reranking reranking,
-                            Ingestion ingestion) {
+public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Context context,
+                            Reranking reranking, Ingestion ingestion) {
 
   /**
    * JWT 配置。
@@ -21,6 +21,15 @@ public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Re
    * 检索配置。
    */
   public record Retrieval(int topK, int candidateTopK, double similarityThreshold) {
+
+  }
+
+  /**
+   * 长会话上下文预算配置。
+   */
+  public record Context(int maxInputTokens, int reservedOutputTokens, int recentTurns,
+                        int summaryTriggerTokens, int maxSummaryTokens,
+                        int minEvidenceTokens) {
 
   }
 

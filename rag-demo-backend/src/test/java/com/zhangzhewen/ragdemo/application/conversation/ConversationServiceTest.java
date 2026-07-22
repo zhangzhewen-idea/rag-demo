@@ -7,29 +7,37 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
+import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
+import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.ContextSummaryGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentRerankGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.QueryExpansionGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.QueryRewriteGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.TokenEstimator;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeBase;
 import com.zhangzhewen.ragdemo.domain.knowledge.KnowledgeBaseStatus;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * 问答用例编排测试。
@@ -75,10 +83,10 @@ class ConversationServiceTest {
     when(fixture.search.search(1L, plan, 20, .6)).thenReturn(candidates);
     when(fixture.rerank.rerank(rewritten, candidates, 6)).thenReturn(evidence);
     doAnswer(invocation -> {
-      Consumer<String> delta = invocation.getArgument(3);
+      Consumer<String> delta = invocation.getArgument(1);
       delta.accept("回答");
-      return null;
-    }).when(fixture.ai).streamAnswer(eq(question), eq(List.of()), eq(evidence), any());
+      return new AiUsage(120, 8);
+    }).when(fixture.ai).streamAnswer(any(), any());
 
     StringBuilder stream = new StringBuilder();
     var result = fixture.service.chat(9L, 2L, question, stream::append).join();
@@ -87,9 +95,16 @@ class ConversationServiceTest {
     assertThat(result.references()).isEqualTo(evidence);
     verify(fixture.search).search(1L, plan, 20, .6);
     verify(fixture.rerank).rerank(rewritten, candidates, 6);
-    verify(fixture.ai).streamAnswer(eq(question), eq(List.of()), eq(evidence), any());
+    ArgumentCaptor<AnswerContext> context = ArgumentCaptor.forClass(AnswerContext.class);
+    verify(fixture.ai).streamAnswer(context.capture(), any());
+    assertThat(context.getValue().userPrompt()).contains("问题：" + question)
+        .contains("<CONVERSATION_SUMMARY>").contains("<RECENT_MESSAGES>")
+        .contains("<EVIDENCE>");
+    assertThat(context.getValue().evidence()).isEqualTo(evidence);
     verify(fixture.conversations).saveMessage(9L, "USER", question, "COMPLETED", null, null,
         null);
+    verify(fixture.conversations).saveMessage(9L, "ASSISTANT", "回答", "COMPLETED", 120, 8,
+        result.elapsedMs());
   }
 
   /**
@@ -100,7 +115,7 @@ class ConversationServiceTest {
     Fixture fixture = new Fixture();
     Message previous = new Message(8L, 9L, "ASSISTANT", "Apple Inc. 的 2024 年 Q2 财报",
         "COMPLETED", null, null, null, LocalDateTime.now());
-    when(fixture.conversations.recentMessages(9L, 20)).thenReturn(List.of(previous));
+    when(fixture.conversations.messagesAfter(9L, 0L)).thenReturn(List.of(previous));
     String contextual = previous.content() + "\n追问：它的股价表现呢？";
     String rewritten = "Apple Inc. 2024 年 Q2 股价表现";
     RetrievalQuery plan = new RetrievalQuery(rewritten, "Apple 2024 Q2 股价");
@@ -142,10 +157,10 @@ class ConversationServiceTest {
     when(fixture.search.search(1L, paiQuery, 20, .6)).thenReturn(List.of(pai));
     when(fixture.rerank.rerank(rewritten, fused, 6)).thenReturn(evidence);
     doAnswer(invocation -> {
-      Consumer<String> delta = invocation.getArgument(3);
+      Consumer<String> delta = invocation.getArgument(1);
       delta.accept("对比回答");
-      return null;
-    }).when(fixture.ai).streamAnswer(eq(question), eq(List.of()), eq(evidence), any());
+      return new AiUsage(100, 10);
+    }).when(fixture.ai).streamAnswer(any(), any());
 
     var result = fixture.service.chat(9L, 2L, question, ignored -> {
     }).join();
@@ -157,6 +172,80 @@ class ConversationServiceTest {
     verify(fixture.rerank).rerank(rewritten, fused, 6);
   }
 
+  /**
+   * 超过阈值的旧消息生成摘要，近期四轮仍以原文参与追问改写。
+   */
+  @Test
+  void summarizesOldMessagesAndUsesSummaryForFollowUp() {
+    Fixture fixture = new Fixture();
+    List<Message> history = longHistory();
+    when(fixture.conversations.messagesAfter(9L, 0L)).thenReturn(history);
+    when(fixture.contextSummary.summarize(eq(""), any(), eq(1200))).thenReturn("项目滚动摘要");
+    when(fixture.conversations.saveSummary(any(), eq(0L))).thenReturn(true);
+    String contextual = "项目滚动摘要\n" + history.getLast().content().substring(0, 600)
+        + "\n追问：它还有什么限制？";
+    when(fixture.queryRewrite.rewrite(contextual)).thenReturn("项目限制");
+    when(fixture.queryExpansion.plan("项目限制"))
+        .thenReturn(List.of(new RetrievalQuery("项目限制", "项目 限制")));
+    when(fixture.search.search(1L, new RetrievalQuery("项目限制", "项目 限制"), 20, .6))
+        .thenReturn(List.of());
+
+    fixture.service.chat(9L, 2L, "它还有什么限制？", ignored -> {
+    }).join();
+
+    verify(fixture.contextSummary).summarize(eq(""), any(), eq(1200));
+    verify(fixture.conversations).saveSummary(any(), eq(0L));
+    verify(fixture.queryRewrite).rewrite(contextual);
+  }
+
+  /**
+   * 摘要模型故障时继续按确定性预算裁剪完成检索，不中断问答。
+   */
+  @Test
+  void fallsBackWhenSummaryFails() {
+    Fixture fixture = new Fixture();
+    when(fixture.conversations.messagesAfter(9L, 0L)).thenReturn(longHistory());
+    when(fixture.contextSummary.summarize(eq(""), any(), eq(1200)))
+        .thenThrow(new IllegalStateException("模型不可用"));
+    when(fixture.search.search(eq(1L), any(), eq(20), eq(.6))).thenReturn(List.of());
+
+    var result = fixture.service.chat(9L, 2L, "普通问题", ignored -> {
+    }).join();
+
+    assertThat(result.answer()).isEqualTo(ConversationService.NO_EVIDENCE);
+    verify(fixture.conversations, org.mockito.Mockito.never()).saveSummary(any(), anyLong());
+  }
+
+  /**
+   * 摘要版本冲突时重新加载，并只重试一次乐观更新。
+   */
+  @Test
+  void retriesSummaryOnceAfterOptimisticConflict() {
+    Fixture fixture = new Fixture();
+    List<Message> history = longHistory();
+    when(fixture.conversations.messagesAfter(9L, 0L)).thenReturn(history);
+    when(fixture.contextSummary.summarize(eq(""), any(), eq(1200))).thenReturn("摘要");
+    when(fixture.conversations.saveSummary(any(), eq(0L))).thenReturn(false, true);
+    when(fixture.search.search(eq(1L), any(), eq(20), eq(.6))).thenReturn(List.of());
+
+    fixture.service.chat(9L, 2L, "普通问题", ignored -> {
+    }).join();
+
+    verify(fixture.conversations, times(2)).saveSummary(any(), eq(0L));
+  }
+
+  private static List<Message> longHistory() {
+    List<Message> messages = new ArrayList<>();
+    long id = 1L;
+    for (int turn = 0; turn < 5; turn++) {
+      messages.add(new Message(id++, 9L, "USER", "用户内容".repeat(210), "COMPLETED",
+          null, null, null, LocalDateTime.now()));
+      messages.add(new Message(id++, 9L, "ASSISTANT", "助手内容".repeat(210), "COMPLETED",
+          null, null, null, LocalDateTime.now()));
+    }
+    return messages;
+  }
+
   private static final class Fixture {
 
     private final ConversationGateway conversations = mock(ConversationGateway.class);
@@ -166,8 +255,12 @@ class ConversationServiceTest {
     private final KnowledgeGateway knowledge = mock(KnowledgeGateway.class);
     private final QueryRewriteGateway queryRewrite = mock(QueryRewriteGateway.class);
     private final QueryExpansionGateway queryExpansion = mock(QueryExpansionGateway.class);
+    private final ContextSummaryGateway contextSummary = mock(ContextSummaryGateway.class);
+    private final TokenEstimator tokens = new TestTokenEstimator();
     private final ConversationService service = new ConversationService(conversations, search,
-        rerank, ai, knowledge, queryRewrite, queryExpansion, new RetrievalPolicy(6, 20, .6));
+        rerank, ai, knowledge, queryRewrite, queryExpansion, new RetrievalPolicy(6, 20, .6),
+        contextSummary, new ContextAssemblyPolicy(24000, 4000, 4, 8000, 1200, 8000,
+        tokens));
 
     private Fixture() {
       when(conversations.findConversationById(9L))
@@ -175,7 +268,7 @@ class ConversationServiceTest {
       when(knowledge.findKnowledgeById(1L))
           .thenReturn(Optional.of(
               new KnowledgeBase(1L, "kb", null, null, KnowledgeBaseStatus.ENABLED)));
-      when(conversations.recentMessages(9L, 20)).thenReturn(List.of());
+      when(conversations.messagesAfter(9L, 0L)).thenReturn(List.of());
       when(queryRewrite.rewrite(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
       when(queryExpansion.plan(anyString())).thenAnswer(invocation -> {
         String query = invocation.getArgument(0);
@@ -183,6 +276,23 @@ class ConversationServiceTest {
       });
       when(conversations.saveMessage(anyLong(), anyString(), anyString(), anyString(), any(), any(),
           any())).thenReturn(10L);
+    }
+  }
+
+  private static final class TestTokenEstimator implements TokenEstimator {
+
+    @Override
+    public int estimate(String text) {
+      return text == null ? 0 : text.codePointCount(0, text.length());
+    }
+
+    @Override
+    public String truncate(String text, int maxTokens) {
+      if (text == null || maxTokens <= 0) {
+        return "";
+      }
+      return estimate(text) <= maxTokens ? text
+          : text.substring(0, text.offsetByCodePoints(0, maxTokens));
     }
   }
 }

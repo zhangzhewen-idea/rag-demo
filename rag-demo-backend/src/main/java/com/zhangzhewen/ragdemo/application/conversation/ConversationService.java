@@ -1,7 +1,11 @@
 package com.zhangzhewen.ragdemo.application.conversation;
 
 import com.zhangzhewen.ragdemo.application.BusinessException;
+import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
+import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
+import com.zhangzhewen.ragdemo.domain.conversation.ConversationSummary;
+import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
@@ -9,6 +13,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.AiGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.ConversationGateway;
+import com.zhangzhewen.ragdemo.domain.gateway.ContextSummaryGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentRerankGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.DocumentSearchGateway;
 import com.zhangzhewen.ragdemo.domain.gateway.KnowledgeGateway;
@@ -18,6 +23,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +35,8 @@ import org.springframework.stereotype.Service;
 public class ConversationService {
 
   public static final String NO_EVIDENCE = "当前知识库中未找到可靠依据";
+  private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
+  private static final int MAX_SUMMARY_BATCHES = 20;
   private final ConversationGateway conversations;
   private final DocumentSearchGateway search;
   private final DocumentRerankGateway rerank;
@@ -36,6 +45,8 @@ public class ConversationService {
   private final QueryRewriteGateway queryRewrite;
   private final QueryExpansionGateway queryExpansion;
   private final RetrievalPolicy policy;
+  private final ContextSummaryGateway contextSummary;
+  private final ContextAssemblyPolicy contextPolicy;
 
   /**
    * 注入用例依赖。
@@ -43,7 +54,8 @@ public class ConversationService {
   public ConversationService(ConversationGateway conversations, DocumentSearchGateway search,
       DocumentRerankGateway rerank, AiGateway ai, KnowledgeGateway knowledge,
       QueryRewriteGateway queryRewrite, QueryExpansionGateway queryExpansion,
-      RetrievalPolicy policy) {
+      RetrievalPolicy policy, ContextSummaryGateway contextSummary,
+      ContextAssemblyPolicy contextPolicy) {
     this.conversations = conversations;
     this.search = search;
     this.rerank = rerank;
@@ -52,6 +64,8 @@ public class ConversationService {
     this.queryRewrite = queryRewrite;
     this.queryExpansion = queryExpansion;
     this.policy = policy;
+    this.contextSummary = contextSummary;
+    this.contextPolicy = contextPolicy;
   }
 
   /**
@@ -101,10 +115,11 @@ public class ConversationService {
       Consumer<String> delta) {
     Conversation c = requireOwned(conversationId, userId);
     requireSearchable(c.knowledgeBaseId());
-    List<Message> history = conversations.recentMessages(conversationId, 20);
+    PreparedHistory prepared = prepareHistory(conversationId);
+    List<Message> history = prepared.messages();
     conversations.saveMessage(conversationId, "USER", question, "COMPLETED", null, null, null);
     long start = System.nanoTime();
-    List<RetrievedChunk> refs = retrieve(c.knowledgeBaseId(), question, history);
+    List<RetrievedChunk> refs = retrieve(c.knowledgeBaseId(), question, prepared.summary(), history);
     if (refs.isEmpty()) {
       delta.accept(NO_EVIDENCE);
       Long id = conversations.saveMessage(conversationId, "ASSISTANT", NO_EVIDENCE, "COMPLETED",
@@ -113,22 +128,23 @@ public class ConversationService {
           new ChatResult(id, NO_EVIDENCE, List.of(), elapsed(start)));
     }
     StringBuilder answer = new StringBuilder();
+    AnswerContext context = contextPolicy.assemble(question, prepared.summary(), history, refs);
     return CompletableFuture.supplyAsync(() -> {
-      ai.streamAnswer(question, history, refs, p -> {
+      AiUsage usage = ai.streamAnswer(context, p -> {
         answer.append(p);
         delta.accept(p);
       });
       long elapsed = elapsed(start);
       Long id = conversations.saveMessage(conversationId, "ASSISTANT", answer.toString(),
-          "COMPLETED", null, null, elapsed);
-      conversations.saveReferences(id, refs);
-      return new ChatResult(id, answer.toString(), refs, elapsed);
+          "COMPLETED", usage.promptTokens(), usage.completionTokens(), elapsed);
+      conversations.saveReferences(id, context.evidence());
+      return new ChatResult(id, answer.toString(), context.evidence(), elapsed);
     });
   }
 
-  private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question,
+  private List<RetrievedChunk> retrieve(Long knowledgeBaseId, String question, String summary,
       List<Message> history) {
-    String rewritten = queryRewrite.rewrite(contextualQuery(question, history));
+    String rewritten = queryRewrite.rewrite(contextualQuery(question, summary, history));
     List<RetrievalQuery> plans = queryExpansion.plan(rewritten);
     List<List<RetrievedChunk>> rankings = plans.stream()
         .map(plan -> search.search(knowledgeBaseId, plan, policy.candidateTopK(),
@@ -141,7 +157,7 @@ public class ConversationService {
     return rerank.rerank(rewritten, candidates, policy.topK());
   }
 
-  private String contextualQuery(String question, List<Message> history) {
+  private String contextualQuery(String question, String summary, List<Message> history) {
     String normalized = normalize(question);
     boolean refersToHistory = List.of("这", "那", "上述", "前面", "刚才", "其他", "除了", "它")
         .stream().anyMatch(normalized::contains);
@@ -153,10 +169,64 @@ public class ConversationService {
       if ("ASSISTANT".equals(message.role()) && !message.content().isBlank()) {
         String context = message.content().length() > 600
             ? message.content().substring(0, 600) : message.content();
-        return context + "\n追问：" + question;
+        String prefix = summary == null || summary.isBlank() ? "" : summary + "\n";
+        return prefix + context + "\n追问：" + question;
       }
     }
-    return question;
+    return summary == null || summary.isBlank() ? question : summary + "\n追问：" + question;
+  }
+
+  private PreparedHistory prepareHistory(Long conversationId) {
+    ConversationSummary summary = conversations.findSummary(conversationId)
+        .orElseGet(() -> ConversationSummary.empty(conversationId));
+    List<Message> messages = conversations.messagesAfter(conversationId,
+        summary.throughMessageId());
+    int batches = 0;
+    while (contextPolicy.shouldSummarize(messages) && batches++ < MAX_SUMMARY_BATCHES) {
+      CompressionAttempt attempt = compressOnce(summary, messages);
+      if (!attempt.completed()) {
+        if (!attempt.conflict()) {
+          break;
+        }
+        summary = conversations.findSummary(conversationId)
+            .orElseGet(() -> ConversationSummary.empty(conversationId));
+        messages = conversations.messagesAfter(conversationId, summary.throughMessageId());
+        attempt = compressOnce(summary, messages);
+        if (!attempt.completed()) {
+          break;
+        }
+      }
+      summary = attempt.summary();
+      long cursor = summary.throughMessageId();
+      messages = messages.stream().filter(message -> message.id() > cursor).toList();
+    }
+    return new PreparedHistory(summary.content(), messages);
+  }
+
+  private CompressionAttempt compressOnce(ConversationSummary summary, List<Message> messages) {
+    List<Message> batch = contextPolicy.nextSummaryBatch(summary.content(), messages);
+    if (batch.isEmpty()) {
+      return new CompressionAttempt(summary, false, false);
+    }
+    String compressed;
+    try {
+      compressed = contextSummary.summarize(summary.content(), batch,
+          contextPolicy.maxSummaryTokens());
+    } catch (RuntimeException exception) {
+      log.warn("会话摘要失败，回退到确定性上下文裁剪: conversationId={}",
+          summary.conversationId(), exception);
+      return new CompressionAttempt(summary, false, false);
+    }
+    if (compressed == null || compressed.isBlank()) {
+      log.warn("会话摘要为空，回退到确定性上下文裁剪: conversationId={}",
+          summary.conversationId());
+      return new CompressionAttempt(summary, false, false);
+    }
+    long throughMessageId = batch.getLast().id();
+    ConversationSummary updated = new ConversationSummary(summary.conversationId(), compressed,
+        throughMessageId, summary.version() + 1);
+    boolean saved = conversations.saveSummary(updated, summary.version());
+    return new CompressionAttempt(saved ? updated : summary, saved, !saved);
   }
 
   private String normalize(String value) {
@@ -197,6 +267,15 @@ public class ConversationService {
    */
   public record ChatResult(Long messageId, String answer, List<RetrievedChunk> references,
                            long elapsedMs) {
+
+  }
+
+  private record PreparedHistory(String summary, List<Message> messages) {
+
+  }
+
+  private record CompressionAttempt(ConversationSummary summary, boolean completed,
+                                    boolean conflict) {
 
   }
 }
