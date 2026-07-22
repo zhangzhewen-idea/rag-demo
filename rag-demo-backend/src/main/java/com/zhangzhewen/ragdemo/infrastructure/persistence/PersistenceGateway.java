@@ -47,6 +47,10 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
       "INSERT IGNORE INTO ai_conversation_summary(conversation_id,summary,through_message_id,version) VALUES(?,?,?,1)";
   static final String SUMMARY_UPDATE =
       "UPDATE ai_conversation_summary SET summary=?,through_message_id=?,version=version+1 WHERE conversation_id=? AND version=? AND through_message_id<?";
+  static final String MARK_DOCUMENT_READY =
+      "UPDATE kb_document SET status='READY',chunk_count=?,failure_stage=NULL,failure_reason=NULL WHERE id=? AND status='PROCESSING' AND deleted=0";
+  static final String DELETED_DOCUMENT_IDS_QUERY =
+      "SELECT id FROM kb_document WHERE deleted=1 ORDER BY id";
   private final JdbcTemplate jdbc;
   private final SystemMetricsMapper metrics;
 
@@ -298,17 +302,23 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
   }
 
   @Override
+  public List<Long> listDeletedDocumentIds() {
+    return jdbc.queryForList(DELETED_DOCUMENT_IDS_QUERY, Long.class);
+  }
+
+  @Override
   public boolean transit(Long id, DocumentStatus expected, DocumentStatus target) {
+    if (!expected.canTransitTo(target)) {
+      return false;
+    }
     return jdbc.update(
         "UPDATE kb_document SET status=?,failure_stage=NULL,failure_reason=NULL WHERE id=? AND status=? AND deleted=0",
         target.name(), id, expected.name()) == 1;
   }
 
   @Override
-  public void markReady(Long id, int chunkCount) {
-    jdbc.update(
-        "UPDATE kb_document SET status='READY',chunk_count=?,failure_stage=NULL,failure_reason=NULL WHERE id=? AND status='PROCESSING'",
-        chunkCount, id);
+  public boolean markReady(Long id, int chunkCount) {
+    return jdbc.update(MARK_DOCUMENT_READY, chunkCount, id) == 1;
   }
 
   @Override

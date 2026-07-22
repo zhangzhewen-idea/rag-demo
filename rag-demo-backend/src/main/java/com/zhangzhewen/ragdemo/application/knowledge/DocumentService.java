@@ -111,6 +111,11 @@ public class DocumentService {
    */
   public void delete(Long id) {
     KnowledgeDocument d = require(id);
+    if (!d.status().canTransitTo(DocumentStatus.DELETING)) {
+      String message = d.status() == DocumentStatus.PROCESSING
+          ? "文档正在处理中，请稍后删除" : "当前文档状态不能删除";
+      throw new BusinessException("DOCUMENT_DELETE_NOT_ALLOWED", message, HttpStatus.CONFLICT);
+    }
     if (!documents.transit(id, d.status(), DocumentStatus.DELETING)) {
       throw new BusinessException("DOCUMENT_STATE_CONFLICT", "文档状态已变化", HttpStatus.CONFLICT);
     }

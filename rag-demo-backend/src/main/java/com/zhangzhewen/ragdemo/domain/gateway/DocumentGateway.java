@@ -26,6 +26,11 @@ public interface DocumentGateway {
   List<KnowledgeDocument> listByKnowledgeBase(Long knowledgeBaseId);
 
   /**
+   * 查询已逻辑删除文档，用于补偿清理外部索引。
+   */
+  List<Long> listDeletedDocumentIds();
+
+  /**
    * 条件抢占状态，保证任务幂等。
    */
   boolean transit(Long id, DocumentStatus expected, DocumentStatus target);
@@ -33,7 +38,7 @@ public interface DocumentGateway {
   /**
    * 标记入库完成。
    */
-  void markReady(Long id, int chunkCount);
+  boolean markReady(Long id, int chunkCount);
 
   /**
    * 标记失败。

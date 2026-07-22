@@ -73,14 +73,25 @@ public class DocumentIngestionWorker {
         }
         vectors.add(texts, metadata);
       }
-      documents.markReady(documentId, chunks.size());
+      if (!documents.markReady(documentId, chunks.size())) {
+        cleanupVectors(documentId);
+        log.warn("文档状态已变化，已补偿删除刚写入的向量: documentId={}", documentId);
+        return;
+      }
       log.info("文档向量入库完成: documentId={}, chunks={}", documentId, chunks.size());
     } catch (Exception e) {
-      try {
-        vectors.deleteByDocumentId(documentId);
-      } catch (Exception ignored) {/* 保留原始失败原因，删除可由管理员重试补偿。 */}
+      cleanupVectors(documentId);
       documents.markFailed(documentId, "INGESTION", e.getMessage(), true);
       log.warn("文档向量入库失败: documentId={}, reason={}", documentId, e.getMessage());
+    }
+  }
+
+  private void cleanupVectors(Long documentId) {
+    try {
+      vectors.deleteByDocumentId(documentId);
+    } catch (Exception exception) {
+      log.error("文档向量补偿删除失败: documentId={}, reason={}", documentId,
+          exception.getMessage());
     }
   }
 

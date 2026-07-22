@@ -120,7 +120,8 @@ public class KnowledgeService {
           HttpStatus.CONFLICT);
     }
     for (KnowledgeDocument document : documents.listByKnowledgeBase(id)) {
-      if (!documents.transit(document.id(), document.status(), DocumentStatus.DELETING)) {
+      if (!document.status().canTransitTo(DocumentStatus.DELETING)
+          || !documents.transit(document.id(), document.status(), DocumentStatus.DELETING)) {
         throw new BusinessException("DOCUMENT_STATE_CONFLICT", "文档状态已变化",
             HttpStatus.CONFLICT);
       }
