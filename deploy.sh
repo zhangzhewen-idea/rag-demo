@@ -17,7 +17,60 @@ require_command() {
 }
 
 env_value() {
+    local name="$1"
+
+    if [[ -n "${!name+x}" ]]; then
+        printf '%s\n' "${!name}"
+        return
+    fi
+
     awk -F= -v key="$1" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "${ENV_FILE}"
+}
+
+java_major_version() {
+    "$1" -XshowSettings:properties -version 2>&1 \
+        | awk -F'= ' '/^[[:space:]]*java\.specification\.version = / {print $2; exit}'
+}
+
+configure_java() {
+    local java_home_candidate=""
+
+    if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/java" ]] \
+        && [[ "$(java_major_version "${JAVA_HOME}/bin/java")" == "25" ]]; then
+        return
+    fi
+
+    if command -v java >/dev/null 2>&1 \
+        && [[ "$(java_major_version "$(command -v java)")" == "25" ]]; then
+        unset JAVA_HOME
+        return
+    fi
+
+    if [[ -x /usr/libexec/java_home ]]; then
+        java_home_candidate="$(/usr/libexec/java_home -v 25 2>/dev/null || true)"
+        if [[ -n "${java_home_candidate}" && -x "${java_home_candidate}/bin/java" ]] \
+            && [[ "$(java_major_version "${java_home_candidate}/bin/java")" == "25" ]]; then
+            export JAVA_HOME="${java_home_candidate}"
+            export PATH="${JAVA_HOME}/bin:${PATH}"
+            echo "已自动使用 JDK 25：${JAVA_HOME}"
+            return
+        fi
+    fi
+
+    for java_home_candidate in \
+        /opt/homebrew/opt/openjdk@25 \
+        /usr/local/opt/openjdk@25; do
+        if [[ -x "${java_home_candidate}/bin/java" ]] \
+            && [[ "$(java_major_version "${java_home_candidate}/bin/java")" == "25" ]]; then
+            export JAVA_HOME="${java_home_candidate}"
+            export PATH="${JAVA_HOME}/bin:${PATH}"
+            echo "已自动使用 JDK 25：${JAVA_HOME}"
+            return
+        fi
+    done
+
+    echo "未找到 JDK 25，请设置 JAVA_HOME 后重试。" >&2
+    exit 1
 }
 
 require_env_value() {
@@ -52,6 +105,7 @@ wait_for_url() {
 require_command docker
 require_command curl
 require_command awk
+configure_java
 
 if [[ ! -f "${ENV_FILE}" ]]; then
     echo "缺少 ${ENV_FILE}" >&2
@@ -84,11 +138,11 @@ readonly BACKEND_PORT="$(env_value BACKEND_PORT)"
 mkdir -p "${DATA_ROOT}/uploads" "${DATA_ROOT}/log"
 
 echo "正在打包 rag-demo-backend..."
+"${BACKEND_DIR}/mvnw" -f "${BACKEND_DIR}/pom.xml" -DskipTests package
 artifact_name="$(
     "${BACKEND_DIR}/mvnw" -f "${BACKEND_DIR}/pom.xml" help:evaluate \
         -Dexpression=project.build.finalName -q -DforceStdout
 )"
-"${BACKEND_DIR}/mvnw" -f "${BACKEND_DIR}/pom.xml" -DskipTests package
 
 readonly JAR_PATH="${BACKEND_DIR}/target/${artifact_name}.jar"
 if [[ ! -f "${JAR_PATH}" ]]; then

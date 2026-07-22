@@ -108,6 +108,12 @@ cp deploy.env.example .env.docker
 ./deploy.sh
 ```
 
+宿主机默认端口冲突时，可在命令行覆盖端口；命令行值优先于 `.env.docker`：
+
+```bash
+FRONTEND_PORT=3001 BACKEND_PORT=8081 ./deploy.sh
+```
+
 发布资产的无副作用验证命令：
 
 ```bash
