@@ -65,12 +65,12 @@ public class SecurityConfig {
   }
 
   /**
-   * 仅允许本地 Vite 开发源携带 Refresh Cookie。
+   * 允许本地 Vite 与生产前端携带 Refresh Cookie。
    */
   @Bean
   CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration c = new CorsConfiguration();
-    c.setAllowedOrigins(List.of("http://localhost:5173"));
+    c.setAllowedOrigins(List.of("http://localhost:5173", "https://rag-demo-web.harmonies.cc"));
     c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     c.setAllowedHeaders(List.of("*"));
     c.setAllowCredentials(true);
