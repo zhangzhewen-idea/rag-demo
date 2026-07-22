@@ -96,6 +96,12 @@ export const evaluationApi = {
   createDataset: (data: CreateEvaluationDataset) => api(http.post<ApiResponse<{ id: number }>>(
     '/admin/evaluations/datasets', data
   )),
+  updateDataset: (id: number, data: CreateEvaluationDataset) => api(
+    http.put<ApiResponse<unknown>>(`/admin/evaluations/datasets/${id}`, data)
+  ),
+  removeDataset: (id: number) => api(
+    http.delete<ApiResponse<unknown>>(`/admin/evaluations/datasets/${id}`)
+  ),
   runs: (datasetId: number) => api(http.get<ApiResponse<EvaluationRun[]>>(
     `/admin/evaluations/datasets/${datasetId}/runs`
   )),

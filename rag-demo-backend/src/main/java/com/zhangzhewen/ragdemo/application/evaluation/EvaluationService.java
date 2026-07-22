@@ -51,18 +51,27 @@ public class EvaluationService {
   }
 
   public Long createDataset(CreateDatasetRequest request, Long userId) {
-    knowledge.findKnowledgeById(request.knowledgeBaseId()).orElseThrow(
-        () -> new BusinessException("KB_NOT_FOUND", "知识库不存在", HttpStatus.NOT_FOUND));
-    boolean duplicate = evaluations.listDatasets(request.knowledgeBaseId()).stream()
-        .anyMatch(item -> item.name().equals(request.name().trim())
-            && item.version().equals(request.version().trim()));
-    if (duplicate) {
-      throw new BusinessException("EVALUATION_DATASET_EXISTS", "同名评估集版本已存在",
-          HttpStatus.CONFLICT);
-    }
+    validateDatasetRequest(request, null);
     List<EvaluationCase> cases = request.cases().stream().map(this::mapCase).toList();
     return evaluations.createDataset(request.knowledgeBaseId(), request.name().trim(),
         request.version().trim(), cases, userId);
+  }
+
+  public void updateDataset(Long id, CreateDatasetRequest request) {
+    dataset(id);
+    validateDatasetRequest(request, id);
+    List<EvaluationCase> cases = request.cases().stream().map(this::mapCase).toList();
+    if (!evaluations.updateDatasetIfUnused(id, request.knowledgeBaseId(), request.name().trim(),
+        request.version().trim(), cases)) {
+      throw immutableDataset(); // todo 调试时可以开启
+    }
+  }
+
+  public void deleteDataset(Long id) {
+    dataset(id);
+    if (!evaluations.deleteDatasetIfUnused(id)) {
+      throw immutableDataset(); // todo 调试时可以开启
+    }
   }
 
   public List<Dataset> listDatasets(Long knowledgeBaseId) {
@@ -111,6 +120,24 @@ public class EvaluationService {
       throw new BusinessException("EVALUATION_RESULT_NOT_FOUND", "评估结果不存在",
           HttpStatus.NOT_FOUND);
     }
+  }
+
+  private void validateDatasetRequest(CreateDatasetRequest request, Long excludedId) {
+    knowledge.findKnowledgeById(request.knowledgeBaseId()).orElseThrow(
+        () -> new BusinessException("KB_NOT_FOUND", "知识库不存在", HttpStatus.NOT_FOUND));
+    boolean duplicate = evaluations.listDatasets(request.knowledgeBaseId()).stream()
+        .anyMatch(item -> !item.id().equals(excludedId)
+            && item.name().equals(request.name().trim())
+            && item.version().equals(request.version().trim()));
+    if (duplicate) {
+      throw new BusinessException("EVALUATION_DATASET_EXISTS", "同名评估集版本已存在",
+          HttpStatus.CONFLICT);
+    }
+  }
+
+  private BusinessException immutableDataset() {
+    return new BusinessException("EVALUATION_DATASET_IMMUTABLE",
+        "评估集已产生运行记录，不允许修改或删除，请创建新版本", HttpStatus.CONFLICT);
   }
 
   private EvaluationCase mapCase(CaseRequest request) {

@@ -20,6 +20,11 @@ public interface EvaluationGateway {
 
   Optional<Dataset> findDataset(Long id);
 
+  boolean updateDatasetIfUnused(Long id, Long knowledgeBaseId, String name, String version,
+      List<EvaluationCase> cases);
+
+  boolean deleteDatasetIfUnused(Long id);
+
   Long createRun(Long datasetId, Long baselineRunId, String configSnapshot, Long triggeredBy,
       int totalCases);
 

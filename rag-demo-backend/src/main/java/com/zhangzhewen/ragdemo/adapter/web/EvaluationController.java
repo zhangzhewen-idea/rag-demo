@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,6 +57,19 @@ public class EvaluationController {
   @GetMapping("/datasets/{id}")
   public ApiResponse<Dataset> dataset(@PathVariable Long id) {
     return WebSupport.ok(evaluations.dataset(id));
+  }
+
+  @PutMapping("/datasets/{id}")
+  public ApiResponse<Void> updateDataset(@PathVariable Long id,
+      @Valid @RequestBody CreateDatasetRequest request) {
+    evaluations.updateDataset(id, request);
+    return WebSupport.ok(null);
+  }
+
+  @DeleteMapping("/datasets/{id}")
+  public ApiResponse<Void> deleteDataset(@PathVariable Long id) {
+    evaluations.deleteDataset(id);
+    return WebSupport.ok(null);
   }
 
   @PostMapping("/datasets/{id}/runs")

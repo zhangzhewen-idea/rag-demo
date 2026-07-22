@@ -72,6 +72,64 @@ class EvaluationServiceTest {
   }
 
   @Test
+  void updatesDatasetBeforeItHasRuns() {
+    Dataset dataset = new Dataset(3L, 1L, "核心问题", "v1", 1, 9L,
+        LocalDateTime.now(), List.of());
+    when(gateway.findDataset(3L)).thenReturn(Optional.of(dataset));
+    when(knowledge.findKnowledgeById(1L)).thenReturn(Optional.of(
+        new KnowledgeBase(1L, "制度库", null, null, KnowledgeBaseStatus.ENABLED)));
+    when(gateway.updateDatasetIfUnused(org.mockito.ArgumentMatchers.eq(3L),
+        org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("核心问题"),
+        org.mockito.ArgumentMatchers.eq("v2"), org.mockito.ArgumentMatchers.anyList()))
+        .thenReturn(true);
+
+    service.updateDataset(3L, new CreateDatasetRequest(1L, "核心问题", "v2",
+        request("FACTUAL", List.of(
+            new ExpectedContextRequest("制度.md", "年假十天"))).cases()));
+
+    verify(gateway).updateDatasetIfUnused(org.mockito.ArgumentMatchers.eq(3L),
+        org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("核心问题"),
+        org.mockito.ArgumentMatchers.eq("v2"), org.mockito.ArgumentMatchers.anyList());
+  }
+
+  @Test
+  void rejectsUpdatingDatasetAfterItHasRuns() {
+    Dataset dataset = new Dataset(3L, 1L, "核心问题", "v1", 1, 9L,
+        LocalDateTime.now(), List.of());
+    when(gateway.findDataset(3L)).thenReturn(Optional.of(dataset));
+    when(knowledge.findKnowledgeById(1L)).thenReturn(Optional.of(
+        new KnowledgeBase(1L, "制度库", null, null, KnowledgeBaseStatus.ENABLED)));
+
+    assertThatThrownBy(() -> service.updateDataset(3L, request("FACTUAL", List.of(
+        new ExpectedContextRequest("制度.md", "年假十天")))))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("已产生运行记录");
+  }
+
+  @Test
+  void deletesDatasetBeforeItHasRuns() {
+    Dataset dataset = new Dataset(3L, 1L, "核心问题", "v1", 1, 9L,
+        LocalDateTime.now(), List.of());
+    when(gateway.findDataset(3L)).thenReturn(Optional.of(dataset));
+    when(gateway.deleteDatasetIfUnused(3L)).thenReturn(true);
+
+    service.deleteDataset(3L);
+
+    verify(gateway).deleteDatasetIfUnused(3L);
+  }
+
+  @Test
+  void rejectsDeletingDatasetAfterItHasRuns() {
+    Dataset dataset = new Dataset(3L, 1L, "核心问题", "v1", 1, 9L,
+        LocalDateTime.now(), List.of());
+    when(gateway.findDataset(3L)).thenReturn(Optional.of(dataset));
+
+    assertThatThrownBy(() -> service.deleteDataset(3L))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("已产生运行记录");
+  }
+
+  @Test
   void startsRunAgainstLatestPassedBaseline() {
     Dataset dataset = new Dataset(3L, 1L, "核心问题", "v1", 1, 9L,
         LocalDateTime.now(), List.of());

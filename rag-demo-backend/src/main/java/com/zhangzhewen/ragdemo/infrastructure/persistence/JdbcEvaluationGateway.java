@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * 基于 Spring JDBC 保存不可变评估集、运行轨迹和人工复核。
+ * 基于 Spring JDBC 保存评估集、运行轨迹和人工复核；评估集产生运行后保持不可变。
  */
 @Repository
 public class JdbcEvaluationGateway implements EvaluationGateway {
@@ -47,6 +47,11 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
     long datasetId = insert(
         "INSERT INTO rag_evaluation_dataset(knowledge_base_id,name,version,created_by) VALUES(?,?,?,?)",
         knowledgeBaseId, name, version, createdBy);
+    insertCases(datasetId, cases);
+    return datasetId;
+  }
+
+  private void insertCases(long datasetId, List<EvaluationCase> cases) {
     for (EvaluationCase evaluationCase : cases) {
       long caseId = insert(
           "INSERT INTO rag_evaluation_case(dataset_id,question,golden_answer,answer_type,critical) VALUES(?,?,?,?,?)",
@@ -58,7 +63,6 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
             caseId, context.sourceName(), context.evidenceContains());
       }
     }
-    return datasetId;
   }
 
   @Override
@@ -85,6 +89,49 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
             rs.getString("name"), rs.getString("version"), rs.getInt("case_count"),
             rs.getLong("created_by"), rs.getTimestamp("created_at").toLocalDateTime(),
             loadCases(id)), id).stream().findFirst();
+  }
+
+  @Override
+  @Transactional
+  public boolean updateDatasetIfUnused(Long id, Long knowledgeBaseId, String name, String version,
+      List<EvaluationCase> cases) {
+    if (!lockUnusedDataset(id)) {
+      return false;
+    }
+    jdbc.update(
+        "UPDATE rag_evaluation_dataset SET knowledge_base_id=?,name=?,version=? WHERE id=?",
+        knowledgeBaseId, name, version, id);
+    deleteCases(id);
+    insertCases(id, cases);
+    return true;
+  }
+
+  @Override
+  @Transactional
+  public boolean deleteDatasetIfUnused(Long id) {
+    if (!lockUnusedDataset(id)) {
+      return false;
+    }
+    deleteCases(id);
+    jdbc.update("DELETE FROM rag_evaluation_dataset WHERE id=?", id);
+    return true;
+  }
+
+  private boolean lockUnusedDataset(Long id) {
+    List<Long> locked = jdbc.query("SELECT id FROM rag_evaluation_dataset WHERE id=? FOR UPDATE",
+        (rs, index) -> rs.getLong("id"), id);
+    if (locked.isEmpty()) {
+      return false;
+    }
+    Integer runs = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM rag_evaluation_run WHERE dataset_id=?", Integer.class, id);
+    return runs == null || runs == 0;
+  }
+
+  private void deleteCases(Long datasetId) {
+    jdbc.update("DELETE ec FROM rag_evaluation_expected_context ec "
+        + "JOIN rag_evaluation_case c ON c.id=ec.case_id WHERE c.dataset_id=?", datasetId);
+    jdbc.update("DELETE FROM rag_evaluation_case WHERE dataset_id=?", datasetId);
   }
 
   private List<EvaluationCase> loadCases(Long datasetId) {

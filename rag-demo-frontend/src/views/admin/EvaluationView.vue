@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
-import {ElMessage, type FormInstance, type FormRules} from 'element-plus'
+import {ElMessage, ElMessageBox, type FormInstance, type FormRules} from 'element-plus'
 import {adminApi, evaluationApi} from '@/api'
 import type {
   CreateEvaluationDataset,
@@ -77,6 +77,7 @@ const loading = ref(false)
 const runLoading = ref(false)
 const starting = ref(false)
 const createVisible = ref(false)
+const editingDatasetId = ref<number>()
 const formDocuments = ref<DocumentTask[]>([])
 const formDocumentsLoading = ref(false)
 const reviewVisible = ref(false)
@@ -223,12 +224,36 @@ async function loadRuns(datasetId: number, showLoading = true) {
 }
 
 async function openCreate() {
+  editingDatasetId.value = undefined
   Object.assign(form, {
     knowledgeBaseId: selectedKnowledgeBaseId.value ?? knowledge.value[0]?.id ?? 0,
     name: '', version: 'v1', cases: [newCase()]
   })
   createVisible.value = true
   await loadFormDocuments(form.knowledgeBaseId)
+}
+
+async function openEdit(dataset: EvaluationDataset) {
+  try {
+    const detail = await evaluationApi.dataset(dataset.id)
+    editingDatasetId.value = detail.id
+    Object.assign(form, {
+      knowledgeBaseId: detail.knowledgeBaseId,
+      name: detail.name,
+      version: detail.version,
+      cases: detail.cases.map(item => ({
+        question: item.question,
+        goldenAnswer: item.goldenAnswer,
+        answerType: item.answerType,
+        critical: item.critical,
+        expectedContexts: item.expectedContexts.map(evidence => ({...evidence})),
+      })),
+    })
+    createVisible.value = true
+    await loadFormDocuments(detail.knowledgeBaseId)
+  } catch (error) {
+    ElMessage.error((error as Error).message)
+  }
 }
 
 async function loadFormDocuments(knowledgeBaseId: number) {
@@ -280,15 +305,40 @@ function validateCases() {
   return true
 }
 
-async function createDataset() {
+async function saveDataset() {
   if (!await createFormRef.value?.validate().catch(() => false) || !validateCases()) return
   try {
+    if (editingDatasetId.value) {
+      const updatedId = editingDatasetId.value
+      await evaluationApi.updateDataset(updatedId, form)
+      createVisible.value = false
+      ElMessage.success('评估集已修改')
+      await loadDatasets(form.knowledgeBaseId)
+      selectedDataset.value = datasets.value.find(item => item.id === updatedId) ?? datasets.value[0]
+      return
+    }
     const created = await evaluationApi.createDataset(form)
     createVisible.value = false
     ElMessage.success('评估集已创建')
     await loadDatasets(form.knowledgeBaseId)
     selectedDataset.value = datasets.value.find(item => item.id === created.id) ?? datasets.value[0]
   } catch (error) {
+    ElMessage.error((error as Error).message)
+  }
+}
+
+async function removeDataset(dataset: EvaluationDataset) {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除评估集“${dataset.name} · ${dataset.version}”？此操作不可撤销。`,
+      '删除评估集',
+      {type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消'}
+    )
+    await evaluationApi.removeDataset(dataset.id)
+    ElMessage.success('评估集已删除')
+    if (selectedKnowledgeBaseId.value) await loadDatasets(selectedKnowledgeBaseId.value)
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
     ElMessage.error((error as Error).message)
   }
 }
@@ -371,13 +421,18 @@ function statusType(status: string) {
     <div class="evaluation-layout">
       <aside class="panel dataset-panel" v-loading="loading">
         <div class="panel-head"><h2>评估集</h2><span>{{ datasets.length }} 个版本</span></div>
-        <button v-for="dataset in datasets" :key="dataset.id"
-                :class="['dataset-item', {active: selectedDataset?.id === dataset.id}]"
-                @click="selectedDataset = dataset">
-          <strong>{{ dataset.name }}</strong>
-          <span><el-tag size="small">{{ dataset.version }}</el-tag>{{ dataset.caseCount }} 条样本</span>
-          <small>{{ dateTime(dataset.createdAt) }}</small>
-        </button>
+        <article v-for="dataset in datasets" :key="dataset.id"
+                 :class="['dataset-item', {active: selectedDataset?.id === dataset.id}]">
+          <button type="button" class="dataset-select" @click="selectedDataset = dataset">
+            <strong>{{ dataset.name }}</strong>
+            <span><el-tag size="small">{{ dataset.version }}</el-tag>{{ dataset.caseCount }} 条样本</span>
+            <small>{{ dateTime(dataset.createdAt) }}</small>
+          </button>
+          <div class="dataset-actions">
+            <el-button text type="primary" size="small" @click="openEdit(dataset)">修改</el-button>
+            <el-button text type="danger" size="small" @click="removeDataset(dataset)">删除</el-button>
+          </div>
+        </article>
         <el-empty v-if="!loading && !datasets.length" description="暂无评估集" :image-size="80"/>
       </aside>
 
@@ -463,11 +518,16 @@ function statusType(status: string) {
             </div>
             <div v-if="result.execution.scores" class="case-score-row">
               <span>Hit {{ percent(result.execution.scores.candidateHitRate) }}</span>
+              <span>MRR {{ percent(result.execution.scores.candidateMrr) }}</span>
               <span>Recall {{ percent(result.execution.scores.contextRecall) }}</span>
               <span>Precision {{ percent(result.execution.scores.contextPrecision) }}</span>
               <span>忠实度 {{ percent(result.execution.scores.faithfulness) }}</span>
+              <span>答案相关性 {{ percent(result.execution.scores.answerRelevancy) }}</span>
               <span>证据准确率 {{ percent(result.execution.scores.evidenceSupportAccuracy) }}</span>
-              <span>{{ result.execution.latencyMs }} ms</span>
+              <span>拒答准确率 {{ percent(result.execution.scores.noAnswerAccuracy) }}</span>
+              <span>Prompt Token {{ result.execution.promptTokens }}</span>
+              <span>Completion Token {{ result.execution.completionTokens }}</span>
+              <span>延迟 {{ result.execution.latencyMs }} ms</span>
             </div>
             <el-collapse v-if="result.execution.finalEvidence.length">
               <el-collapse-item title="查看最终证据" name="evidence">
@@ -494,10 +554,11 @@ function statusType(status: string) {
       </el-collapse>
     </section>
 
-    <el-dialog v-model="createVisible" title="新建评估集" width="880px" top="4vh">
+    <el-dialog v-model="createVisible" :title="editingDatasetId ? '修改评估集' : '新建评估集'"
+               width="880px" top="4vh">
       <el-form ref="createFormRef" :model="form" :rules="rules" label-position="top">
         <div class="form-grid">
-          <el-form-item label="知识库" prop="knowledgeBaseId"><el-select v-model="form.knowledgeBaseId" class="wide" @change="changeFormKnowledgeBase"><el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id"/></el-select></el-form-item>
+          <el-form-item label="知识库" prop="knowledgeBaseId"><el-select v-model="form.knowledgeBaseId" class="wide" :disabled="!!editingDatasetId" @change="changeFormKnowledgeBase"><el-option v-for="kb in knowledge" :key="kb.id" :label="kb.name" :value="kb.id"/></el-select></el-form-item>
           <el-form-item label="评估集名称" prop="name"><el-input v-model="form.name" maxlength="128"/></el-form-item>
           <el-form-item label="版本" prop="version"><el-input v-model="form.version" maxlength="64"/></el-form-item>
         </div>
@@ -528,7 +589,7 @@ function statusType(status: string) {
         </section>
         <el-button class="wide" :disabled="form.cases.length >= 100" @click="form.cases.push(newCase())">添加样本</el-button>
       </el-form>
-      <template #footer><el-button @click="createVisible = false">取消</el-button><el-button type="primary" @click="createDataset">创建评估集</el-button></template>
+      <template #footer><el-button @click="createVisible = false">取消</el-button><el-button type="primary" @click="saveDataset">{{ editingDatasetId ? '保存修改' : '创建评估集' }}</el-button></template>
     </el-dialog>
 
     <el-dialog v-model="reviewVisible" title="人工复核" width="500px">
@@ -542,7 +603,7 @@ function statusType(status: string) {
 </template>
 
 <style scoped>
-.evaluation-layout{display:grid;grid-template-columns:320px 1fr;gap:18px}.panel,.run-detail{background:rgba(255,255,255,.88);border:1px solid #fff;border-radius:20px;box-shadow:0 10px 35px rgba(65,45,112,.07)}.panel{padding:20px;min-height:330px}.panel-head,.detail-head,.run-summary,.sample-title,.samples-head,.evidence-title,.review-row{display:flex;align-items:center;justify-content:space-between}.panel-head{margin-bottom:14px}.panel-head h2,.detail-head h2{margin:0}.panel-head span{color:#746d7d;font-size:13px}.dataset-panel{display:flex;flex-direction:column;gap:8px}.dataset-item{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border:1px solid #ece7f7;border-radius:13px;background:#fff;color:inherit;text-align:left;cursor:pointer}.dataset-item:hover,.dataset-item.active{border-color:#8a69ef;background:#f4f0ff}.dataset-item>span{display:flex;align-items:center;gap:8px;color:#676071}.dataset-item small{color:#8a8491}.runs-panel .el-table{cursor:pointer}.run-detail{padding:26px;margin-top:20px}.run-summary{gap:12px}.evaluation-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}.evaluation-metrics article{padding:17px;border:1px solid #eee9f7;border-radius:14px;background:#faf9fe}.evaluation-metrics span{color:#6f6879;font-size:13px}.evaluation-metrics b{display:block;margin-top:8px;font-size:24px}.run-meta,.case-score-row{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0;color:#6d6677}.case-results{border-top:1px solid #ece7f5}.case-title{display:flex;align-items:center;gap:10px;min-width:0}.case-title b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.case-body{padding:4px 18px 18px}.answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.answer-grid article,.judge,.evidence-card{padding:14px;border-radius:12px;background:#f8f6fc}.answer-grid h4{margin:0 0 8px}.answer-grid p,.judge,.evidence-card p{white-space:pre-wrap;line-height:1.65;margin:0}.case-score-row span{padding:6px 10px;border-radius:999px;background:#f0ecfa;font-size:12px}.evidence-card{margin-bottom:8px}.evidence-card small{display:block;color:#787180;margin:5px 0}.review-row{margin-top:15px}.reviewed,.pass-text{color:#219168}.fail-text{color:#d04a5d}.form-grid{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:14px}.samples-head{margin:10px 0}.samples-head h3{margin:0}.samples-head span{color:#837c8b;font-size:13px}.sample-card{padding:18px;margin-bottom:14px;border:1px solid #e9e3f5;border-radius:15px;background:#fbfaff}.sample-title{margin-bottom:10px}.sample-options{display:grid;grid-template-columns:1fr 1fr;gap:16px}.evidence-title{margin-bottom:9px}.evidence-form{display:grid;grid-template-columns:210px 1fr auto;gap:8px;margin-bottom:8px}@media(max-width:1180px){.evaluation-layout{grid-template-columns:280px 1fr}.evaluation-metrics{grid-template-columns:repeat(2,1fr)}}
+.evaluation-layout{display:grid;grid-template-columns:320px 1fr;gap:18px}.panel,.run-detail{background:rgba(255,255,255,.88);border:1px solid #fff;border-radius:20px;box-shadow:0 10px 35px rgba(65,45,112,.07)}.panel{padding:20px;min-height:330px}.panel-head,.detail-head,.run-summary,.sample-title,.samples-head,.evidence-title,.review-row{display:flex;align-items:center;justify-content:space-between}.panel-head{margin-bottom:14px}.panel-head h2,.detail-head h2{margin:0}.panel-head span{color:#746d7d;font-size:13px}.dataset-panel{display:flex;flex-direction:column;gap:8px}.dataset-item{display:flex;align-items:flex-start;border:1px solid #ece7f7;border-radius:13px;background:#fff;color:inherit;overflow:hidden}.dataset-item:hover,.dataset-item.active{border-color:#8a69ef;background:#f4f0ff}.dataset-select{display:flex;flex:1;min-width:0;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.dataset-select>span{display:flex;align-items:center;gap:8px;color:#676071}.dataset-select small{color:#8a8491}.dataset-actions{display:flex;align-items:center;padding:8px 8px 0 0}.dataset-actions .el-button+.el-button{margin-left:2px}.runs-panel .el-table{cursor:pointer}.run-detail{padding:26px;margin-top:20px}.run-summary{gap:12px}.evaluation-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}.evaluation-metrics article{padding:17px;border:1px solid #eee9f7;border-radius:14px;background:#faf9fe}.evaluation-metrics span{color:#6f6879;font-size:13px}.evaluation-metrics b{display:block;margin-top:8px;font-size:24px}.run-meta,.case-score-row{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0;color:#6d6677}.case-results{border-top:1px solid #ece7f5}.case-title{display:flex;align-items:center;gap:10px;min-width:0}.case-title b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.case-body{padding:4px 18px 18px}.answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.answer-grid article,.judge,.evidence-card{padding:14px;border-radius:12px;background:#f8f6fc}.answer-grid h4{margin:0 0 8px}.answer-grid p,.judge,.evidence-card p{white-space:pre-wrap;line-height:1.65;margin:0}.case-score-row span{padding:6px 10px;border-radius:999px;background:#f0ecfa;font-size:12px}.evidence-card{margin-bottom:8px}.evidence-card small{display:block;color:#787180;margin:5px 0}.review-row{margin-top:15px}.reviewed,.pass-text{color:#219168}.fail-text{color:#d04a5d}.form-grid{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:14px}.samples-head{margin:10px 0}.samples-head h3{margin:0}.samples-head span{color:#837c8b;font-size:13px}.sample-card{padding:18px;margin-bottom:14px;border:1px solid #e9e3f5;border-radius:15px;background:#fbfaff}.sample-title{margin-bottom:10px}.sample-options{display:grid;grid-template-columns:1fr 1fr;gap:16px}.evidence-title{margin-bottom:9px}.evidence-form{display:grid;grid-template-columns:210px 1fr auto;gap:8px;margin-bottom:8px}@media(max-width:1180px){.evaluation-layout{grid-template-columns:280px 1fr}.evaluation-metrics{grid-template-columns:repeat(2,1fr)}}
 
 .failure-summary {
   margin-top: 16px;
