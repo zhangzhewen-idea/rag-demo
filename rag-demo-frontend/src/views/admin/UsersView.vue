@@ -20,6 +20,9 @@ interface UserForm {
   avatarUrl: string
 }
 
+const ROLE_TEXT: Record<string, string> = {ADMIN: '管理员', USER: '普通用户'}
+const STATUS_TEXT: Record<string, string> = {ENABLED: '已启用', DISABLED: '已停用'}
+
 const list = ref<User[]>([])
 const dialog = ref(false)
 const editing = ref<number>()
@@ -167,12 +170,16 @@ async function reset(id: number) {
       <el-table-column prop="nickname" label="昵称"/>
       <el-table-column label="角色">
         <template #default="{ row }">
-          <el-tag v-for="role in row.roles" :key="role" class="role-tag">{{ role }}</el-tag>
+          <el-tag v-for="role in row.roles" :key="role" class="role-tag">
+            {{ ROLE_TEXT[role] ?? role }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="120">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">{{ row.status }}</el-tag>
+          <el-tag :type="row.status === 'ENABLED' ? 'success' : 'info'">
+            {{ STATUS_TEXT[row.status] ?? row.status }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="220">
