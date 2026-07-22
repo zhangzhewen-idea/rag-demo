@@ -83,11 +83,11 @@ public class TikaDocumentParserGateway implements DocumentParserGateway {
   }
 
   private List<Document> load(Resource resource, String extension) throws Exception {
-    if ("md".equals(extension)) {
-      var readerConfig = MarkdownDocumentReaderConfig.builder().withIncludeCodeBlock(true)
-          .withIncludeBlockquote(true).build();
-      return new MarkdownDocumentReader(resource, readerConfig).get();
-    }
+//    if ("md".equals(extension)) {
+//      var readerConfig = MarkdownDocumentReaderConfig.builder().withIncludeCodeBlock(true)
+//          .withIncludeBlockquote(true).build();
+//      return new MarkdownDocumentReader(resource, readerConfig).get();
+//    }
     try (var input = resource.getInputStream()) {
       return List.of(new Document(tika.parseToString(input)));
     }

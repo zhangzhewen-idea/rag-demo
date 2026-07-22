@@ -55,7 +55,7 @@ rag:
     access-ttl: 30m
     refresh-ttl: 7d
   retrieval:
-    top-k: ${RAG_TOP_K:10}
+    top-k: ${RAG_TOP_K:6}
     candidate-top-k: ${RAG_CANDIDATE_TOP_K:20}
     similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.2}
   context:
@@ -79,9 +79,9 @@ rag:
     pipeline-version: ${RAG_EVALUATION_PIPELINE_VERSION:v1}
     judge-model: ${RAG_EVALUATION_JUDGE_MODEL:deepseek-v4-flash}
     candidate-hit-rate: ${RAG_EVALUATION_CANDIDATE_HIT_RATE:0.9}
-    candidate-mrr: ${RAG_EVALUATION_CANDIDATE_MRR:0.10}
+    candidate-mrr: ${RAG_EVALUATION_CANDIDATE_MRR:0.50}
     context-recall: ${RAG_EVALUATION_CONTEXT_RECALL:0.8}
-    context-precision: ${RAG_EVALUATION_CONTEXT_PRECISION:0.10}
+    context-precision: ${RAG_EVALUATION_CONTEXT_PRECISION:0.60}
     faithfulness: ${RAG_EVALUATION_FAITHFULNESS:0.8}
     answer-relevancy: ${RAG_EVALUATION_ANSWER_RELEVANCY:0.8}
     evidence-support-accuracy: ${RAG_EVALUATION_EVIDENCE_SUPPORT_ACCURACY:0.8}

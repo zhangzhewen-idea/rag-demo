@@ -130,4 +130,39 @@ describe('文档切片预览', () => {
     expect(document.querySelector<HTMLInputElement>('.el-input-number input')!.value).toBe('800')
     wrapper.unmount()
   })
+
+  it('将自定义分隔符中的转义写法转换为真实控制字符', async () => {
+    const wrapper = mount(DocumentsView, {
+      attachTo: document.body,
+      global: {plugins: [ElementPlus]},
+    })
+    await flushPromises()
+
+    const file = new File(['文档内容'], 'sample.txt', {type: 'text/plain'})
+    const fileInput = wrapper.find('input[type="file"]')
+    Object.defineProperty(fileInput.element, 'files', {value: [file]})
+    await fileInput.trigger('change')
+    await flushPromises()
+
+    document.querySelector<HTMLElement>('.chunk-form .el-select__wrapper')!.click()
+    await nextTick()
+    const customOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+      .find(option => option.textContent?.trim() === '自定义')!
+    customOption.click()
+    await nextTick()
+
+    const separatorInput = document.querySelector<HTMLInputElement>(
+      '.chunk-form input[placeholder*="支持"]')!
+    separatorInput.value = '\\r\\n\\t\\\\'
+    separatorInput.dispatchEvent(new Event('input', {bubbles: true}))
+    await nextTick()
+
+    clickButton('生成预览')
+    await flushPromises()
+
+    expect(adminApi.previewChunks).toHaveBeenCalledWith(1, file, expect.objectContaining({
+      separator: '\r\n\t\\',
+    }))
+    wrapper.unmount()
+  })
 })

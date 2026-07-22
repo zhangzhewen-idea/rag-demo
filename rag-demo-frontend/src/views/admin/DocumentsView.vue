@@ -41,8 +41,18 @@ let requestId = 0
 
 const ready = computed(() => list.value.filter(item => item.status === 'READY').length)
 const hasActiveTasks = computed(() => list.value.some(item => ACTIVE_STATUSES.has(item.status)))
+function decodeSeparator(value: string) {
+  const escapes: Record<string, string> = {
+    n: '\n',
+    r: '\r',
+    t: '\t',
+    '\\': '\\',
+  }
+  return value.replace(/\\(n|r|t|\\)/g, (_, key: string) => escapes[key])
+}
+
 const resolvedSeparator = computed(() => chunking.separatorPreset === CUSTOM_SEPARATOR
-  ? chunking.customSeparator : chunking.separatorPreset)
+  ? decodeSeparator(chunking.customSeparator) : chunking.separatorPreset)
 const previewValid = computed(() => !!preview.value && preview.value.totalChunks > 0)
 
 onMounted(async () => {
@@ -281,7 +291,7 @@ function tag(status: string) {
             </el-select>
             <el-input v-if="chunking.separatorPreset === CUSTOM_SEPARATOR"
                       v-model="chunking.customSeparator" maxlength="20" show-word-limit
-                      placeholder="输入普通文本分隔符，不支持正则表达式"/>
+                      placeholder="支持 \n、\r、\t、\\，不支持正则表达式"/>
           </el-form-item>
           <div class="chunk-number-row">
             <el-form-item label="最大长度（字符）">
