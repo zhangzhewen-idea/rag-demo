@@ -32,7 +32,7 @@ const formRef = ref<FormInstance>()
 const form = reactive<UserForm>({
   username: '',
   nickname: '',
-  password: '',
+  password: '123456',
   status: 'ENABLED',
   roles: ['USER'],
   avatarUrl: ''
@@ -79,7 +79,7 @@ function open(item?: User) {
   } : {
     username: '',
     nickname: '',
-    password: '',
+    password: '123456',
     status: 'ENABLED',
     roles: ['USER'],
     avatarUrl: ''
@@ -135,16 +135,8 @@ async function uploadAvatar(options: UploadRequestOptions) {
 
 async function reset(id: number) {
   try {
-    const {value} = await ElMessageBox.prompt('请输入新的登录密码', '重置密码', {
-      inputType: 'password',
-      inputValidator: value => {
-        const length = value.trim().length
-        return (length >= 6 && length <= 100) || '密码长度应为 6 至 100 个字符'
-      },
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-    })
-    await adminApi.resetPassword(id, value)
+    await ElMessageBox.confirm('密码将重置为 123456，确认继续？', '重置密码', {type: 'warning'})
+    await adminApi.resetPassword(id)
     ElMessage.success('密码已重置')
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') ElMessage.error((error as Error).message)
