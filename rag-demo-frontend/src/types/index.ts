@@ -129,9 +129,9 @@ export interface EvaluationScores {
   candidateMrr?: number;
   contextRecall?: number;
   contextPrecision?: number;
-  faithfulness: number;
-  answerRelevancy: number;
-  evidenceSupportAccuracy: number;
+  faithfulness?: number;
+  answerRelevancy?: number;
+  evidenceSupportAccuracy?: number;
   noAnswerAccuracy?: number
 }
 

@@ -33,6 +33,15 @@ class EvaluationPolicyTest {
     assertThat(policy.passes(scores, null)).isTrue();
   }
 
+  @Test
+  void refusalCaseOnlyRequiresNoAnswerAccuracy() {
+    Scores accepted = new Scores(null, null, null, null, null, null, null, 1D);
+    Scores missed = new Scores(null, null, null, null, null, null, null, 0D);
+
+    assertThat(policy.passes(accepted, null)).isTrue();
+    assertThat(policy.passes(missed, null)).isFalse();
+  }
+
   private Scores scores(double hit, double faithfulness) {
     return new Scores(hit, .8, .9, .7, faithfulness, .9, .9, 1D);
   }

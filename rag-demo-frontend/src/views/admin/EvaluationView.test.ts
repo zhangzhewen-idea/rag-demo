@@ -212,6 +212,38 @@ describe('RAG 评估页面', () => {
     wrapper.unmount()
   })
 
+  it('纯拒答运行只校验拒答准确率', async () => {
+    const refusalRun = {
+      ...(await evaluationApi.run(12)),
+      status: 'PASSED',
+      passed: true,
+      scores: {
+        faithfulness: undefined,
+        answerRelevancy: undefined,
+        evidenceSupportAccuracy: undefined,
+        noAnswerAccuracy: 1,
+      },
+      results: [],
+    }
+    evaluationApi.runs.mockResolvedValue([refusalRun])
+    evaluationApi.run.mockResolvedValue(refusalRun)
+
+    const wrapper = mount(EvaluationView, {
+      attachTo: document.body,
+      global: {plugins: [ElementPlus]},
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('质量门禁通过')
+    for (const key of ['faithfulness', 'answerRelevancy', 'evidenceSupportAccuracy']) {
+      expect(wrapper.get(`[data-metric="${key}"]`).classes())
+        .toContain('metric-not-applicable')
+    }
+    expect(wrapper.get('[data-metric="noAnswerAccuracy"]').classes())
+      .toContain('metric-passed')
+    wrapper.unmount()
+  })
+
   it('逐题结果展示全部评估指标、Token 和延迟', async () => {
     const wrapper = mount(EvaluationView, {
       attachTo: document.body,

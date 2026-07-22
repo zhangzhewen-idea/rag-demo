@@ -287,16 +287,11 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
   private Scores scores(Object hit, Object mrr, Object recall, Object precision,
       Object faithfulness, Object relevancy, Object support, Object noAnswer) {
     return new Scores(decimal(hit), decimal(mrr), decimal(recall), decimal(precision),
-        zeroIfNull(decimal(faithfulness)), zeroIfNull(decimal(relevancy)),
-        zeroIfNull(decimal(support)), decimal(noAnswer));
+        decimal(faithfulness), decimal(relevancy), decimal(support), decimal(noAnswer));
   }
 
   private Double decimal(Object value) {
     return value == null ? null : ((Number) value).doubleValue();
-  }
-
-  private double zeroIfNull(Double value) {
-    return value == null ? 0D : value;
   }
 
   private Long nullableLong(Object value) {

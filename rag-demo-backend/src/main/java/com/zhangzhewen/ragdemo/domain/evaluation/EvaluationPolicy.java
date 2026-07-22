@@ -28,9 +28,9 @@ public record EvaluationPolicy(double candidateHitRate, double candidateMrr,
         || !atLeast(current.candidateMrr(), candidateMrr)
         || !atLeast(current.contextRecall(), contextRecall)
         || !atLeast(current.contextPrecision(), contextPrecision)
-        || current.faithfulness() < faithfulness
-        || current.answerRelevancy() < answerRelevancy
-        || current.evidenceSupportAccuracy() < evidenceSupportAccuracy
+        || !atLeast(current.faithfulness(), faithfulness)
+        || !atLeast(current.answerRelevancy(), answerRelevancy)
+        || !atLeast(current.evidenceSupportAccuracy(), evidenceSupportAccuracy)
         || !atLeast(current.noAnswerAccuracy(), noAnswerAccuracy)) {
       return false;
     }
@@ -39,10 +39,9 @@ public record EvaluationPolicy(double candidateHitRate, double candidateMrr,
         && !regressed(current.candidateMrr(), baseline.candidateMrr())
         && !regressed(current.contextRecall(), baseline.contextRecall())
         && !regressed(current.contextPrecision(), baseline.contextPrecision())
-        && current.faithfulness() + maxRegression >= baseline.faithfulness()
-        && current.answerRelevancy() + maxRegression >= baseline.answerRelevancy()
-        && current.evidenceSupportAccuracy() + maxRegression
-        >= baseline.evidenceSupportAccuracy()
+        && !regressed(current.faithfulness(), baseline.faithfulness())
+        && !regressed(current.answerRelevancy(), baseline.answerRelevancy())
+        && !regressed(current.evidenceSupportAccuracy(), baseline.evidenceSupportAccuracy())
         && !regressed(current.noAnswerAccuracy(), baseline.noAnswerAccuracy());
   }
 

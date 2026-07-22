@@ -127,30 +127,33 @@ public class EvaluationWorker {
     }
     String answer = generated.refused() ? ConversationPrompt.NO_EVIDENCE : generated.content();
     AiUsage usage = generated.usage();
-    Judgment judgment = judge.judge(evaluationCase.question(), evaluationCase.goldenAnswer(),
-        evaluationCase.answerType(), answer, trace.finalEvidence());
     RetrievalScores retrievalScores = EvaluationMetrics.calculate(
         evaluationCase.expectedContexts(), trace.candidates(), trace.finalEvidence(),
         generated.refused());
-    double relevancy = "REFUSAL".equals(evaluationCase.answerType())
-        && !generated.refused() ? 0D : judgment.answerRelevancy();
+    boolean refusalCase = "REFUSAL".equals(evaluationCase.answerType());
+    Judgment judgment = refusalCase ? null
+        : judge.judge(evaluationCase.question(), evaluationCase.goldenAnswer(),
+            evaluationCase.answerType(), answer, trace.finalEvidence());
+    String rationale = refusalCase
+        ? generated.refused() ? "系统已按预期拒答" : "系统未按预期拒答"
+        : judgment.rationale();
     Scores scores = new Scores(retrievalScores.candidateHitRate(), retrievalScores.candidateMrr(),
         retrievalScores.contextRecall(), retrievalScores.contextPrecision(),
-        judgment.faithfulness(), relevancy, judgment.evidenceSupportAccuracy(),
+        refusalCase ? null : judgment.faithfulness(),
+        refusalCase ? null : judgment.answerRelevancy(),
+        refusalCase ? null : judgment.evidenceSupportAccuracy(),
         retrievalScores.noAnswerAccuracy());
     return new CaseExecution(evaluationCase.id(), answer, generated.refused(),
         trace.rewrittenQuery(), trace.expandedQueries(), trace.candidates(), trace.finalEvidence(),
-        scores, judgment.rationale(), usage.promptTokens(), usage.completionTokens(), elapsed(start),
+        scores, rationale, usage.promptTokens(), usage.completionTokens(), elapsed(start),
         null);
   }
 
   private Scores aggregate(List<CaseExecution> executions) {
     return new Scores(averageNullable(executions, 0), averageNullable(executions, 1),
         averageNullable(executions, 2), averageNullable(executions, 3),
-        executions.stream().mapToDouble(item -> item.scores().faithfulness()).average().orElse(0D),
-        executions.stream().mapToDouble(item -> item.scores().answerRelevancy()).average().orElse(0D),
-        executions.stream().mapToDouble(item -> item.scores().evidenceSupportAccuracy()).average()
-            .orElse(0D), averageNullable(executions, 4));
+        averageNullable(executions, 4), averageNullable(executions, 5),
+        averageNullable(executions, 6), averageNullable(executions, 7));
   }
 
   private Double averageNullable(List<CaseExecution> executions, int metric) {
@@ -159,6 +162,9 @@ public class EvaluationWorker {
       case 1 -> scores.candidateMrr();
       case 2 -> scores.contextRecall();
       case 3 -> scores.contextPrecision();
+      case 4 -> scores.faithfulness();
+      case 5 -> scores.answerRelevancy();
+      case 6 -> scores.evidenceSupportAccuracy();
       default -> scores.noAnswerAccuracy();
     }).filter(java.util.Objects::nonNull).mapToDouble(Double::doubleValue).average()
         .stream().boxed().findFirst().orElse(null);

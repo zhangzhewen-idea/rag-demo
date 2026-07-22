@@ -32,8 +32,8 @@ public final class EvaluationModels {
   }
 
   public record Scores(Double candidateHitRate, Double candidateMrr, Double contextRecall,
-                       Double contextPrecision, double faithfulness, double answerRelevancy,
-                       double evidenceSupportAccuracy, Double noAnswerAccuracy) {
+                       Double contextPrecision, Double faithfulness, Double answerRelevancy,
+                       Double evidenceSupportAccuracy, Double noAnswerAccuracy) {
   }
 
   public record Judgment(double faithfulness, double answerRelevancy,
