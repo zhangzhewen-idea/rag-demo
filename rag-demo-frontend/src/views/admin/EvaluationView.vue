@@ -473,7 +473,12 @@ function statusType(status: string) {
               <el-collapse-item title="查看最终证据" name="evidence">
                 <article v-for="(evidence, evidenceIndex) in result.execution.finalEvidence" :key="`${evidence.documentId}-${evidence.chunkIndex}`" class="evidence-card">
                   <b>{{ evidenceIndex + 1 }}. {{ evidence.sourceName }}</b>
-                  <small>切片 {{ evidence.chunkIndex }} · 相似度 {{ percent(evidence.similarityScore) }}</small>
+                  <small>切片 {{ evidence.chunkIndex }}
+                    <template v-if="evidence.rerankScore != null"> · 重排 {{ evidence.rerankScore.toFixed(4) }}</template>
+                    <template v-if="evidence.fusionScore != null"> · RRF {{ evidence.fusionScore.toFixed(4) }}</template>
+                    <template v-if="evidence.vectorScore != null"> · 向量 {{ evidence.vectorScore.toFixed(4) }}</template>
+                    <template v-if="evidence.bm25Score != null"> · BM25 {{ evidence.bm25Score.toFixed(4) }}</template>
+                  </small>
                   <p>{{ evidence.excerpt }}</p>
                 </article>
               </el-collapse-item>

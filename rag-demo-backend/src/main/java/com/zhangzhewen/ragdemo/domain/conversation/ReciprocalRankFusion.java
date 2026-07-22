@@ -19,16 +19,32 @@ public final class ReciprocalRankFusion {
    * 按文档和切片位置去重，融合排名后截取 TopK。
    */
   public static List<RetrievedChunk> fuse(List<List<RetrievedChunk>> rankings, int topK) {
+    return fuse(rankings, rankings.stream().map(ignored -> 1D).toList(), topK);
+  }
+
+  /**
+   * 按各路检索权重融合排名，权重只作用于名次贡献。
+   */
+  public static List<RetrievedChunk> fuse(List<List<RetrievedChunk>> rankings,
+      List<Double> weights, int topK) {
     if (topK <= 0) {
       throw new IllegalArgumentException("topK 必须大于 0");
     }
+    if (rankings.size() != weights.size()) {
+      throw new IllegalArgumentException("排名列表与权重数量必须一致");
+    }
     Map<ChunkKey, FusedChunk> chunks = new LinkedHashMap<>();
-    for (List<RetrievedChunk> ranking : rankings) {
+    for (int rankingIndex = 0; rankingIndex < rankings.size(); rankingIndex++) {
+      List<RetrievedChunk> ranking = rankings.get(rankingIndex);
+      Double weight = weights.get(rankingIndex);
+      if (weight == null || !Double.isFinite(weight) || weight <= 0) {
+        throw new IllegalArgumentException("权重必须是大于 0 的有限数");
+      }
       for (int rank = 0; rank < ranking.size(); rank++) {
         RetrievedChunk candidate = ranking.get(rank);
         ChunkKey key = new ChunkKey(candidate.documentId(), candidate.chunkIndex());
         FusedChunk fused = chunks.computeIfAbsent(key, ignored -> new FusedChunk(candidate));
-        fused.add(candidate, 1.0 / (RANK_CONSTANT + rank + 1));
+        fused.add(candidate, weight / (RANK_CONSTANT + rank + 1));
       }
     }
     return chunks.values().stream()
@@ -43,7 +59,9 @@ public final class ReciprocalRankFusion {
 
   private static final class FusedChunk {
 
-    private RetrievedChunk chunk;
+    private final RetrievedChunk chunk;
+    private Double vectorScore;
+    private Double bm25Score;
     private double rankScore;
 
     private FusedChunk(RetrievedChunk chunk) {
@@ -52,17 +70,23 @@ public final class ReciprocalRankFusion {
 
     private void add(RetrievedChunk candidate, double score) {
       rankScore += score;
-      if (candidate.similarityScore() > chunk.similarityScore()) {
-        chunk = candidate;
-      }
+      vectorScore = max(vectorScore, candidate.vectorScore());
+      bm25Score = max(bm25Score, candidate.bm25Score());
     }
 
     private RetrievedChunk chunk() {
-      return chunk;
+      return chunk.withFusionScores(vectorScore, bm25Score, rankScore);
     }
 
     private double rankScore() {
       return rankScore;
+    }
+
+    private Double max(Double left, Double right) {
+      if (left == null) {
+        return right;
+      }
+      return right == null ? left : Math.max(left, right);
     }
   }
 }

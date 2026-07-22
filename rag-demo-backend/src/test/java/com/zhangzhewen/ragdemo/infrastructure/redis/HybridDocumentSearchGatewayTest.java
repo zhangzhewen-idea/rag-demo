@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
@@ -19,6 +20,8 @@ import org.springframework.ai.vectorstore.redis.RedisVectorStore;
  */
 class HybridDocumentSearchGatewayTest {
 
+  private static final RetrievalPolicy POLICY = new RetrievalPolicy(6, 20, .2, 1, .8);
+
   /**
    * 普通检索使用同一知识库过滤 BM25 和向量结果并进行 RRF 融合。
    */
@@ -26,7 +29,7 @@ class HybridDocumentSearchGatewayTest {
   void fusesBm25AndVectorRankingsWithinKnowledgeBase() {
     VectorGateway vectors = mock(VectorGateway.class);
     RedisVectorStore store = mock(RedisVectorStore.class);
-    HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store);
+    HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store, POLICY);
     RetrievedChunk semantic = chunk(1L, .8, "语义内容");
     Document keyword = document(2L, "包含 ModelArts 的内容");
     RetrievalQuery query = new RetrievalQuery("ModelArts 平台能力", "华为云 ModelArts");
@@ -37,8 +40,30 @@ class HybridDocumentSearchGatewayTest {
     List<RetrievedChunk> result = gateway.search(9L, query, 10, .7);
 
     assertThat(result).extracting(RetrievedChunk::documentId).containsExactly(1L, 2L);
+    assertThat(result).extracting(RetrievedChunk::fusionScore)
+        .containsExactly(1D / 61, .8D / 61);
     verify(vectors).search(9L, query.semanticQuery(), 10, .7);
     verify(store).searchByText(query.keywordQuery(), "content", 10, "@knowledgeBaseId:{9}");
+  }
+
+  /**
+   * BM25 结果按自身分数降序进入 RRF，不与向量分数交叉比较。
+   */
+  @Test
+  void sortsBm25ResultsByScoreDescendingBeforeFusion() {
+    VectorGateway vectors = mock(VectorGateway.class);
+    RedisVectorStore store = mock(RedisVectorStore.class);
+    HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store, POLICY);
+    RetrievalQuery query = new RetrievalQuery("语义查询", "ModelArts");
+    when(vectors.search(9L, query.semanticQuery(), 3, .7)).thenReturn(List.of());
+    when(store.searchByText(query.keywordQuery(), "content", 3, "@knowledgeBaseId:{9}"))
+        .thenReturn(List.of(document(1L, "低分", .2), document(2L, "高分", 12),
+            document(3L, "中分", 3)));
+
+    List<RetrievedChunk> result = gateway.search(9L, query, 3, .7);
+
+    assertThat(result).extracting(RetrievedChunk::documentId).containsExactly(2L, 3L, 1L);
+    assertThat(result).extracting(RetrievedChunk::bm25Score).containsExactly(12D, 3D, .2);
   }
 
   /**
@@ -48,7 +73,7 @@ class HybridDocumentSearchGatewayTest {
   void filtersBm25SearchByKnowledgeBaseAndDocument() {
     VectorGateway vectors = mock(VectorGateway.class);
     RedisVectorStore store = mock(RedisVectorStore.class);
-    HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store);
+    HybridDocumentSearchGateway gateway = new HybridDocumentSearchGateway(vectors, store, POLICY);
     RetrievalQuery query = new RetrievalQuery("文档内容概览", "内容 概览");
     when(vectors.searchDocument(9L, 2L, query.semanticQuery(), 3, .6)).thenReturn(List.of());
     when(store.searchByText(query.keywordQuery(), "content", 3,
@@ -62,13 +87,18 @@ class HybridDocumentSearchGatewayTest {
   }
 
   private static RetrievedChunk chunk(Long documentId, double score, String excerpt) {
-    return new RetrievedChunk(9L, documentId, "source", 0, score, excerpt, null, null);
+    return new RetrievedChunk(9L, documentId, "source", 0, excerpt, null, null, score, null,
+        null, null);
   }
 
   private static Document document(Long documentId, String text) {
+    return document(documentId, text, .9);
+  }
+
+  private static Document document(Long documentId, String text, double score) {
     return Document.builder().id("doc-" + documentId + "-0").text(text)
         .metadata(Map.of("knowledgeBaseId", "9", "documentId", documentId.toString(),
             "sourceName", "source", "chunkIndex", "0"))
-        .score(.9).build();
+        .score(score).build();
   }
 }

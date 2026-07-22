@@ -65,7 +65,7 @@ class DashScopeDocumentRerankGatewayTest {
     List<RetrievedChunk> result = gateway.rerank("年假规则", candidates, 2);
 
     assertThat(result).extracting(RetrievedChunk::documentId).containsExactly(3L, 1L);
-    assertThat(result).extracting(RetrievedChunk::similarityScore).containsExactly(.7, .9);
+    assertThat(result).extracting(RetrievedChunk::vectorScore).containsExactly(.7, .9);
     assertThat(result).extracting(RetrievedChunk::rerankScore).containsExactly(.96, .72);
     server.verify();
   }
@@ -175,6 +175,7 @@ class DashScopeDocumentRerankGatewayTest {
   }
 
   private RetrievedChunk chunk(Long documentId, double score, String excerpt) {
-    return new RetrievedChunk(9L, documentId, "source", 0, score, excerpt, null, null);
+    return new RetrievedChunk(9L, documentId, "source", 0, excerpt, null, null, score, null,
+        .03, null);
   }
 }

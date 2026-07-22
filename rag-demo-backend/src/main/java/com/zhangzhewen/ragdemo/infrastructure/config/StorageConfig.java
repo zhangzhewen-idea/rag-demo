@@ -44,7 +44,8 @@ public class StorageConfig {
   @Bean
   RetrievalPolicy retrievalPolicy(RagProperties properties) {
     return new RetrievalPolicy(properties.retrieval().topK(),
-        properties.retrieval().candidateTopK(), properties.retrieval().similarityThreshold());
+        properties.retrieval().candidateTopK(), properties.retrieval().similarityThreshold(),
+        properties.retrieval().semanticWeight(), properties.retrieval().bm25Weight());
   }
 
   /**

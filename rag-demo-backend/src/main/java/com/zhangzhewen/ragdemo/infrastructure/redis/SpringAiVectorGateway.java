@@ -3,6 +3,7 @@ package com.zhangzhewen.ragdemo.infrastructure.redis;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
 import com.zhangzhewen.ragdemo.domain.gateway.VectorGateway;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,7 +64,12 @@ public class SpringAiVectorGateway implements VectorGateway {
   private List<RetrievedChunk> search(String query, int topK, double threshold, String filter) {
     SearchRequest request = SearchRequest.builder().query(query).topK(topK)
         .similarityThreshold(threshold).filterExpression(filter).build();
-    return store.similaritySearch(request).stream().map(this::map).toList();
+    return store.similaritySearch(request).stream().map(this::map)
+        .sorted(Comparator.comparing(RetrievedChunk::vectorScore,
+                Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(RetrievedChunk::documentId)
+            .thenComparingInt(RetrievedChunk::chunkIndex))
+        .toList();
   }
 
   /**
@@ -77,9 +83,10 @@ public class SpringAiVectorGateway implements VectorGateway {
   private RetrievedChunk map(Document d) {
     Map<String, Object> m = d.getMetadata();
     return new RetrievedChunk(longValue(m.get("knowledgeBaseId")), longValue(m.get("documentId")),
-        Objects.toString(m.get("sourceName"), "未知来源"), intValue(m.get("chunkIndex")),
-        d.getScore() == null ? 0 : d.getScore(), d.getText(), intNullable(m.get("pageNumber")),
-        m.get("sectionTitle") == null ? null : m.get("sectionTitle").toString());
+        Objects.toString(m.get("sourceName"), "未知来源"), intValue(m.get("chunkIndex")), d.getText(),
+        intNullable(m.get("pageNumber")),
+        m.get("sectionTitle") == null ? null : m.get("sectionTitle").toString(), d.getScore(), null,
+        null, null);
   }
 
   private long longValue(Object v) {

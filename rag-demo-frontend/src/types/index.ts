@@ -43,10 +43,13 @@ export interface Reference {
   documentId: number;
   sourceName: string;
   chunkIndex: number;
-  similarityScore: number;
   excerpt: string;
   pageNumber?: number;
-  sectionTitle?: string
+  sectionTitle?: string;
+  vectorScore: number | null;
+  bm25Score: number | null;
+  fusionScore: number | null;
+  rerankScore: number | null
 }
 
 export interface DocumentTask {
@@ -154,9 +157,12 @@ export interface RetrievedChunk {
   sourceName: string;
   chunkIndex: number;
   excerpt: string;
-  similarityScore: number;
   pageNumber?: number;
-  sectionTitle?: string
+  sectionTitle?: string;
+  vectorScore: number | null;
+  bm25Score: number | null;
+  fusionScore: number | null;
+  rerankScore: number | null
 }
 
 export interface EvaluationExecution {

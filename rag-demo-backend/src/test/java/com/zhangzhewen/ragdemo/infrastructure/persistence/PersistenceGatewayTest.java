@@ -24,12 +24,13 @@ class PersistenceGatewayTest {
   }
 
   /**
-   * 引用入库同时保留初始相似度与可空重排分数。
+   * 引用入库分别保留向量、BM25、RRF 融合和重排分数。
    */
   @Test
-  void insertsBothRetrievalScores() {
+  void insertsSeparatedRetrievalScores() {
     assertThat(PersistenceGateway.REFERENCE_INSERT).contains(
-        "similarity_score,rerank_score,excerpt").contains("VALUES(?,?,?,?,?,?,?,?,?,?)");
+        "vector_score,bm25_score,fusion_score,rerank_score,excerpt")
+        .contains("VALUES(?,?,?,?,?,?,?,?,?,?,?,?)");
   }
 
   /**

@@ -52,8 +52,8 @@ class EvaluationWorkerTest {
         LocalDateTime.now(), List.of(evaluationCase));
     Run run = new Run(5L, 3L, null, "QUEUED", "{}", zeroScores(), false, 1, 0, 0,
         0, 0, 0, 0, null, 9L, null, null, List.of());
-    RetrievedChunk chunk = new RetrievedChunk(1L, 2L, "制度.md", 0, .9,
-        "正式员工年假为十天", null, null);
+    RetrievedChunk chunk = new RetrievedChunk(1L, 2L, "制度.md", 0,
+        "正式员工年假为十天", null, null, .9, null, .03, .95);
     RetrievalTrace trace = new RetrievalTrace("年假天数", List.of(new RetrievalQuery("年假天数",
         "年假 天数")), List.of(chunk), List.of(chunk));
     AnswerContext context = new AnswerContext("system", "user", List.of(chunk), 10, 100);

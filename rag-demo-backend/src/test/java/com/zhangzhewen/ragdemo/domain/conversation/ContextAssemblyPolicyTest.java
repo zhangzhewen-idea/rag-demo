@@ -91,7 +91,8 @@ class ContextAssemblyPolicyTest {
   }
 
   private RetrievedChunk chunk(Long documentId, String source, String excerpt) {
-    return new RetrievedChunk(1L, documentId, source, 0, .9, excerpt, null, null, .95);
+    return new RetrievedChunk(1L, documentId, source, 0, excerpt, null, null, .9, null, .03,
+        .95);
   }
 
   private static final class CodePointTokenEstimator implements TokenEstimator {

@@ -14,7 +14,7 @@ class RetrievalPolicyTest {
    */
   @Test
   void rejectsCandidateTopKBelowFinalTopK() {
-    assertThatThrownBy(() -> new RetrievalPolicy(6, 5, .2))
+    assertThatThrownBy(() -> new RetrievalPolicy(6, 5, .2, 1, .8))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("candidateTopK");
   }
@@ -24,11 +24,24 @@ class RetrievalPolicyTest {
    */
   @Test
   void rejectsSimilarityThresholdOutsideNormalizedRange() {
-    assertThatThrownBy(() -> new RetrievalPolicy(6, 20, 1.1))
+    assertThatThrownBy(() -> new RetrievalPolicy(6, 20, 1.1, 1, .8))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("similarityThreshold");
-    assertThatThrownBy(() -> new RetrievalPolicy(6, 20, Double.NaN))
+    assertThatThrownBy(() -> new RetrievalPolicy(6, 20, Double.NaN, 1, .8))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("similarityThreshold");
+  }
+
+  /**
+   * 混合检索权重必须是正的有限数。
+   */
+  @Test
+  void rejectsInvalidHybridWeights() {
+    assertThatThrownBy(() -> new RetrievalPolicy(6, 20, .2, 0, .8))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("权重");
+    assertThatThrownBy(() -> new RetrievalPolicy(6, 20, .2, 1, Double.NaN))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("权重");
   }
 }

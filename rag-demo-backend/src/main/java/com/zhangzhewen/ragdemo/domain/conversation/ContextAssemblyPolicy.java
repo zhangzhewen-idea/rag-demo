@@ -223,8 +223,6 @@ public class ContextAssemblyPolicy {
   }
 
   private RetrievedChunk copyWithExcerpt(RetrievedChunk item, String excerpt) {
-    return new RetrievedChunk(item.knowledgeBaseId(), item.documentId(), item.sourceName(),
-        item.chunkIndex(), item.similarityScore(), excerpt, item.pageNumber(), item.sectionTitle(),
-        item.rerankScore());
+    return item.withExcerpt(excerpt);
   }
 }

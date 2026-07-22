@@ -43,6 +43,7 @@ class EvaluationMetricsTest {
   }
 
   private RetrievedChunk chunk(String source, String excerpt) {
-    return new RetrievedChunk(1L, (long) source.hashCode(), source, 0, .8, excerpt, null, null);
+    return new RetrievedChunk(1L, (long) source.hashCode(), source, 0, excerpt, null, null, .8,
+        null, .03, null);
   }
 }

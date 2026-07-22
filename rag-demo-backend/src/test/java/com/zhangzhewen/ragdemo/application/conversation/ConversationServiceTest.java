@@ -17,6 +17,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
+import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
@@ -71,17 +72,20 @@ class ConversationServiceTest {
     String question = "苹果股价咋样了？";
     String rewritten = "Apple Inc.（AAPL）股价表现与财务分析";
     RetrievedChunk first =
-        new RetrievedChunk(1L, 3L, "Apple 分析", 0, .9, "股价分析", null, null);
+        new RetrievedChunk(1L, 3L, "Apple 分析", 0, "股价分析", null, null, .9, null,
+            null, null);
     RetrievedChunk second =
-        new RetrievedChunk(1L, 4L, "Apple 财报", 0, .8, "财报内容", null, null);
+        new RetrievedChunk(1L, 4L, "Apple 财报", 0, "财报内容", null, null, .8, null,
+            null, null);
     List<RetrievedChunk> candidates = List.of(first, second);
-    List<RetrievedChunk> evidence = List.of(second.withRerankScore(.95),
-        first.withRerankScore(.7));
+    List<RetrievedChunk> fused = ReciprocalRankFusion.fuse(List.of(candidates), 20);
+    List<RetrievedChunk> evidence = List.of(fused.get(1).withRerankScore(.95),
+        fused.getFirst().withRerankScore(.7));
     RetrievalQuery plan = new RetrievalQuery(rewritten, "Apple AAPL 股价 财务");
     when(fixture.queryRewrite.rewrite(question)).thenReturn(rewritten);
     when(fixture.queryExpansion.plan(rewritten)).thenReturn(List.of(plan));
     when(fixture.search.search(1L, plan, 20, .6)).thenReturn(candidates);
-    when(fixture.rerank.rerank(rewritten, candidates, 6)).thenReturn(evidence);
+    when(fixture.rerank.rerank(rewritten, fused, 6)).thenReturn(evidence);
     doAnswer(invocation -> {
       Consumer<String> delta = invocation.getArgument(1);
       delta.accept("回答");
@@ -94,7 +98,7 @@ class ConversationServiceTest {
     assertThat(stream.toString()).isEqualTo("回答");
     assertThat(result.references()).isEqualTo(evidence);
     verify(fixture.search).search(1L, plan, 20, .6);
-    verify(fixture.rerank).rerank(rewritten, candidates, 6);
+    verify(fixture.rerank).rerank(rewritten, fused, 6);
     ArgumentCaptor<AnswerContext> context = ArgumentCaptor.forClass(AnswerContext.class);
     verify(fixture.ai).streamAnswer(context.capture(), any());
     assertThat(context.getValue().userPrompt()).contains("问题：" + question)
@@ -144,11 +148,14 @@ class ConversationServiceTest {
     RetrievalQuery paiQuery = new RetrievalQuery("阿里云 PAI 平台功能与特点",
         "阿里云 PAI 功能 特点");
     RetrievedChunk modelArts =
-        new RetrievedChunk(1L, 3L, "ModelArts", 0, .9, "ModelArts 内容", null, null);
-    RetrievedChunk pai = new RetrievedChunk(1L, 4L, "PAI", 0, .85, "PAI 内容", null, null);
-    List<RetrievedChunk> fused = List.of(modelArts, pai);
-    List<RetrievedChunk> evidence = List.of(pai.withRerankScore(.95),
-        modelArts.withRerankScore(.9));
+        new RetrievedChunk(1L, 3L, "ModelArts", 0, "ModelArts 内容", null, null, .9, null,
+            null, null);
+    RetrievedChunk pai = new RetrievedChunk(1L, 4L, "PAI", 0, "PAI 内容", null, null,
+        .85, null, null, null);
+    List<RetrievedChunk> fused = ReciprocalRankFusion.fuse(
+        List.of(List.of(modelArts), List.of(modelArts), List.of(pai)), 20);
+    List<RetrievedChunk> evidence = List.of(fused.get(1).withRerankScore(.95),
+        fused.getFirst().withRerankScore(.9));
     when(fixture.queryRewrite.rewrite(question)).thenReturn(rewritten);
     when(fixture.queryExpansion.plan(rewritten))
         .thenReturn(List.of(comparison, modelArtsQuery, paiQuery));
@@ -258,7 +265,7 @@ class ConversationServiceTest {
     private final ContextSummaryGateway contextSummary = mock(ContextSummaryGateway.class);
     private final TokenEstimator tokens = new TestTokenEstimator();
     private final EvidenceRetrievalService retrieval = new EvidenceRetrievalService(search, rerank,
-        queryRewrite, queryExpansion, new RetrievalPolicy(6, 20, .6));
+        queryRewrite, queryExpansion, new RetrievalPolicy(6, 20, .6, 1, .8));
     private final ConversationService service = new ConversationService(conversations, retrieval,
         ai, knowledge, contextSummary,
         new ContextAssemblyPolicy(24000, 4000, 4, 8000, 1200, 8000, tokens));

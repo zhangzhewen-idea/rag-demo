@@ -43,7 +43,7 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
     DocumentGateway, DashboardGateway {
 
   static final String REFERENCE_INSERT =
-      "INSERT INTO ai_message_reference(message_id,knowledge_base_id,document_id,source_name,chunk_index,similarity_score,rerank_score,excerpt,page_number,section_title) VALUES(?,?,?,?,?,?,?,?,?,?)";
+      "INSERT INTO ai_message_reference(message_id,knowledge_base_id,document_id,source_name,chunk_index,vector_score,bm25_score,fusion_score,rerank_score,excerpt,page_number,section_title) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)";
   static final String SUMMARY_INSERT =
       "INSERT IGNORE INTO ai_conversation_summary(conversation_id,summary,through_message_id,version) VALUES(?,?,?,1)";
   static final String SUMMARY_UPDATE =
@@ -271,7 +271,8 @@ public class PersistenceGateway implements UserGateway, KnowledgeGateway, Conver
   public void saveReferences(Long messageId, List<RetrievedChunk> references) {
     references.forEach(r -> jdbc.update(REFERENCE_INSERT,
         messageId, r.knowledgeBaseId(), r.documentId(), r.sourceName(), r.chunkIndex(),
-        r.similarityScore(), r.rerankScore(), r.excerpt(), r.pageNumber(), r.sectionTitle()));
+        r.vectorScore(), r.bm25Score(), r.fusionScore(), r.rerankScore(), r.excerpt(),
+        r.pageNumber(), r.sectionTitle()));
   }
 
   private static final RowMapper<KnowledgeDocument> DOCUMENT_MAPPER = (rs, n) -> new KnowledgeDocument(

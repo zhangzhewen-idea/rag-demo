@@ -20,7 +20,8 @@ public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Co
   /**
    * 检索配置。
    */
-  public record Retrieval(int topK, int candidateTopK, double similarityThreshold) {
+  public record Retrieval(int topK, int candidateTopK, double similarityThreshold,
+                          double semanticWeight, double bm25Weight) {
 
   }
 

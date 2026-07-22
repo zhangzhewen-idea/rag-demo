@@ -63,7 +63,8 @@ class SpringAiGatewayTest {
   }
 
   private AnswerContext context(int promptTokens) {
-    RetrievedChunk evidence = new RetrievedChunk(1L, 2L, "来源", 0, .9, "证据", null, null);
+    RetrievedChunk evidence = new RetrievedChunk(1L, 2L, "来源", 0, "证据", null, null,
+        .9, null, .03, null);
     return new AnswerContext("system", "<EVIDENCE>证据</EVIDENCE>", List.of(evidence),
         promptTokens, 100);
   }

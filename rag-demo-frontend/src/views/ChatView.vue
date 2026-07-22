@@ -209,7 +209,11 @@ onBeforeUnmount(() => {
       <article v-for="(item, index) in references" :key="`${item.documentId}-${item.chunkIndex}`"
                class="reference-card">
         <b>{{ index + 1 }}. {{ item.sourceName }}</b>
-        <small>相似度 {{ (item.similarityScore * 100).toFixed(1) }}% · 切片 {{ item.chunkIndex }}
+        <small>切片 {{ item.chunkIndex }}
+          <template v-if="item.rerankScore != null"> · 重排 {{ item.rerankScore.toFixed(4) }}</template>
+          <template v-if="item.fusionScore != null"> · RRF {{ item.fusionScore.toFixed(4) }}</template>
+          <template v-if="item.vectorScore != null"> · 向量 {{ item.vectorScore.toFixed(4) }}</template>
+          <template v-if="item.bm25Score != null"> · BM25 {{ item.bm25Score.toFixed(4) }}</template>
           <template v-if="item.pageNumber"> · 第 {{ item.pageNumber }} 页</template>
         </small>
         <p>{{ item.excerpt }}</p>

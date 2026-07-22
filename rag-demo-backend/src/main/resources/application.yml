@@ -58,6 +58,8 @@ rag:
     top-k: ${RAG_TOP_K:6}
     candidate-top-k: ${RAG_CANDIDATE_TOP_K:20}
     similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.2}
+    semantic-weight: ${RAG_SEMANTIC_WEIGHT:1.0}
+    bm25-weight: ${RAG_BM25_WEIGHT:0.5}
   context:
     max-input-tokens: ${RAG_CONTEXT_MAX_INPUT_TOKENS:24000}
     reserved-output-tokens: ${RAG_CONTEXT_RESERVED_OUTPUT_TOKENS:4000}
