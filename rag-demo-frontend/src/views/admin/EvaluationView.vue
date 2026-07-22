@@ -111,10 +111,6 @@ const completedPercent = computed(() => {
   if (!run?.totalCases) return 0
   return Math.round(run.completedCases / run.totalCases * 100)
 })
-const baselineScores = computed(() => {
-  const baselineId = selectedRun.value?.baselineRunId
-  return baselineId ? runs.value.find(run => run.id === baselineId)?.scores : undefined
-})
 const metrics = computed(() => {
   const run = selectedRun.value
   const scores = run?.scores
@@ -123,22 +119,17 @@ const metrics = computed(() => {
     const evaluating = ACTIVE_RUN_STATUSES.has(run.status) && JUDGE_METRIC_KEYS.has(definition.key)
     const value = evaluating ? undefined : scores[definition.key]
     const threshold = thresholds.value?.[definition.key]
-    const baseline = baselineScores.value?.[definition.key]
     if (evaluating) {
-      return {...definition, value, threshold, baseline, state: 'pending' as const, reason: ''}
+      return {...definition, value, threshold, state: 'pending' as const, reason: ''}
     }
     if (value == null || threshold == null) {
-      return {...definition, value, threshold, baseline, state: 'not-applicable' as const, reason: ''}
+      return {...definition, value, threshold, state: 'not-applicable' as const, reason: ''}
     }
     const belowThreshold = value < threshold
-    const regressed = baseline != null && thresholds.value != null
-      && value + thresholds.value.maxRegression < baseline
-    const reason = belowThreshold
-      ? `低于合格门槛 ${percent(threshold)}`
-      : regressed ? `较基线下降超过 ${percent(thresholds.value!.maxRegression)}` : ''
+    const reason = belowThreshold ? `低于合格门槛 ${percent(threshold)}` : ''
     return {
-      ...definition, value, threshold, baseline,
-      state: belowThreshold || regressed ? 'failed' as const : 'passed' as const,
+      ...definition, value, threshold,
+      state: belowThreshold ? 'failed' as const : 'passed' as const,
       reason,
     }
   })
@@ -154,7 +145,7 @@ const failureSummary = computed(() => {
   ).length ?? 0
   if (criticalCases) reasons.push(`${criticalCases} 条关键样本未通过`)
   if (selectedRun.value?.failedCases) reasons.push(`${selectedRun.value.failedCases} 条样本执行失败`)
-  return reasons.join('；') || '未发现低于绝对门槛的指标，请检查样本结果或相对基线变化。'
+  return reasons.join('；') || '未发现低于绝对门槛的指标，请检查样本结果。'
 })
 
 onMounted(async () => {

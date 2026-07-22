@@ -49,7 +49,7 @@ public class StorageConfig {
   }
 
   /**
-   * 暴露给评估应用服务的绝对门槛和基线回归策略。
+   * 暴露给评估应用服务的绝对门槛策略。
    */
   @Bean
   EvaluationPolicy evaluationPolicy(RagProperties properties) {
@@ -57,7 +57,7 @@ public class StorageConfig {
     return new EvaluationPolicy(evaluation.candidateHitRate(), evaluation.candidateMrr(),
         evaluation.contextRecall(), evaluation.contextPrecision(), evaluation.faithfulness(),
         evaluation.answerRelevancy(), evaluation.evidenceSupportAccuracy(),
-        evaluation.noAnswerAccuracy(), evaluation.maxRegression());
+        evaluation.noAnswerAccuracy());
   }
 
   /**

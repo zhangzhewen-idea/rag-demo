@@ -143,8 +143,7 @@ export interface EvaluationThresholds {
   faithfulness: number;
   answerRelevancy: number;
   evidenceSupportAccuracy: number;
-  noAnswerAccuracy: number;
-  maxRegression: number
+  noAnswerAccuracy: number
 }
 
 export interface RetrievalQuery {

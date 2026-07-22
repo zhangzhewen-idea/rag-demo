@@ -56,7 +56,7 @@ public record RagProperties(String storageRoot, Jwt jwt, Retrieval retrieval, Co
                            double candidateHitRate, double candidateMrr,
                            double contextRecall, double contextPrecision, double faithfulness,
                            double answerRelevancy, double evidenceSupportAccuracy,
-                           double noAnswerAccuracy, double maxRegression) {
+                           double noAnswerAccuracy) {
 
   }
 }

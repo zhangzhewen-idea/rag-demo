@@ -44,7 +44,6 @@ describe('RAG 评估页面', () => {
       answerRelevancy: .8,
       evidenceSupportAccuracy: .8,
       noAnswerAccuracy: .9,
-      maxRegression: .03,
     })
     adminApi.knowledge.mockResolvedValue([{id: 3, name: '技术规范', status: 'ENABLED'}])
     adminApi.documents.mockResolvedValue([{
@@ -208,6 +207,59 @@ describe('RAG 评估页面', () => {
       expect(card.get('b').text()).toBe('-')
       expect(card.text()).toContain('评估中')
       expect(card.text()).not.toContain('未通过')
+    }
+    wrapper.unmount()
+  })
+
+  it('高于绝对门槛时不因低于历史基线判定失败', async () => {
+    const currentRun = {
+      ...(await evaluationApi.run(12)),
+      status: 'PASSED',
+      passed: true,
+      baselineRunId: 11,
+      scores: {
+        candidateHitRate: .91,
+        candidateMrr: .71,
+        contextRecall: .81,
+        contextPrecision: .61,
+        faithfulness: .81,
+        answerRelevancy: .81,
+        evidenceSupportAccuracy: .81,
+        noAnswerAccuracy: .91,
+      },
+      results: [],
+    }
+    const baselineRun = {
+      ...currentRun,
+      id: 11,
+      baselineRunId: undefined,
+      scores: {
+        candidateHitRate: .99,
+        candidateMrr: .99,
+        contextRecall: .99,
+        contextPrecision: .99,
+        faithfulness: .99,
+        answerRelevancy: .99,
+        evidenceSupportAccuracy: .99,
+        noAnswerAccuracy: .99,
+      },
+    }
+    evaluationApi.runs.mockResolvedValue([currentRun, baselineRun])
+    evaluationApi.run.mockResolvedValue(currentRun)
+
+    const wrapper = mount(EvaluationView, {
+      attachTo: document.body,
+      global: {plugins: [ElementPlus]},
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('质量门禁通过')
+    expect(document.body.textContent).not.toContain('较基线下降超过')
+    for (const key of [
+      'candidateHitRate', 'candidateMrr', 'contextRecall', 'contextPrecision',
+      'faithfulness', 'answerRelevancy', 'evidenceSupportAccuracy', 'noAnswerAccuracy',
+    ]) {
+      expect(wrapper.get(`[data-metric="${key}"]`).classes()).toContain('metric-passed')
     }
     wrapper.unmount()
   })

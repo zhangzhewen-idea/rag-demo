@@ -46,7 +46,7 @@ class EvaluationWorkerTest {
     ContextAssemblyPolicy contextPolicy = mock(ContextAssemblyPolicy.class);
     AiGateway ai = mock(AiGateway.class);
     EvaluationJudgeGateway judge = mock(EvaluationJudgeGateway.class);
-    EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8, .9, .03);
+    EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8, .9);
     EvaluationWorker worker = new EvaluationWorker(evaluations, retrieval, contextPolicy, ai,
         judge, policy);
     EvaluationCase evaluationCase = new EvaluationCase(11L, "年假几天", "十天", "FACTUAL",
@@ -83,7 +83,7 @@ class EvaluationWorkerTest {
     ContextAssemblyPolicy contextPolicy = mock(ContextAssemblyPolicy.class);
     AiGateway ai = mock(AiGateway.class);
     EvaluationJudgeGateway judge = mock(EvaluationJudgeGateway.class);
-    EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8, .9, .03);
+    EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8, .9);
     EvaluationWorker worker = new EvaluationWorker(evaluations, retrieval, contextPolicy, ai,
         judge, policy);
     EvaluationCase evaluationCase = new EvaluationCase(12L, "今天你吃饭了吗？", "拒绝回答",

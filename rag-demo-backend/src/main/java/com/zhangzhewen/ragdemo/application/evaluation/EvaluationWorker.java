@@ -84,7 +84,7 @@ public class EvaluationWorker {
       boolean casePassed;
       try {
         execution = execute(dataset.knowledgeBaseId(), evaluationCase);
-        casePassed = policy.passes(execution.scores(), null);
+        casePassed = policy.passes(execution.scores());
         completed.add(execution);
       } catch (RuntimeException exception) {
         failed++;
@@ -102,10 +102,8 @@ public class EvaluationWorker {
       evaluations.saveCaseResult(runId, evaluationCase, execution, casePassed);
     }
     Scores aggregate = aggregate(completed);
-    Scores baseline = run.baselineRunId() == null ? null
-        : evaluations.findRun(run.baselineRunId()).map(Run::scores).orElse(null);
     boolean passed = failed == 0 && !criticalFailure && !completed.isEmpty()
-        && policy.passes(aggregate, baseline);
+        && policy.passes(aggregate);
     String status = completed.isEmpty() ? "ERROR" : passed ? "PASSED" : "FAILED";
     evaluations.completeRun(runId, status, aggregate, passed, completed.size(), failed,
         completed.stream().mapToInt(CaseExecution::promptTokens).sum(),

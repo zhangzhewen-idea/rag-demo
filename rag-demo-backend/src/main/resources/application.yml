@@ -88,7 +88,6 @@ rag:
     answer-relevancy: ${RAG_EVALUATION_ANSWER_RELEVANCY:0.8}
     evidence-support-accuracy: ${RAG_EVALUATION_EVIDENCE_SUPPORT_ACCURACY:0.8}
     no-answer-accuracy: ${RAG_EVALUATION_NO_ANSWER_ACCURACY:0.9}
-    max-regression: ${RAG_EVALUATION_MAX_REGRESSION:0.03}
 
 management:
   endpoints:

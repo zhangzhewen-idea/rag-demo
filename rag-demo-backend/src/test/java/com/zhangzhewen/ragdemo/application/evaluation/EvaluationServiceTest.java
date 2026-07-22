@@ -33,7 +33,7 @@ class EvaluationServiceTest {
   private final KnowledgeGateway knowledge = mock(KnowledgeGateway.class);
   private final EvaluationWorker worker = mock(EvaluationWorker.class);
   private final EvaluationPolicy policy = new EvaluationPolicy(.9, .7, .8, .6, .8, .8, .8,
-      .9, .03);
+      .9);
   private final EvaluationService service = new EvaluationService(gateway, configuration,
       knowledge, worker, policy);
 
