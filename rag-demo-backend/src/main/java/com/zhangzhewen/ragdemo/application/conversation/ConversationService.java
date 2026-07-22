@@ -5,6 +5,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
 import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
 import com.zhangzhewen.ragdemo.domain.conversation.ConversationSummary;
+import com.zhangzhewen.ragdemo.domain.conversation.GeneratedAnswer;
 import com.zhangzhewen.ragdemo.domain.conversation.ConversationPrompt;
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
@@ -107,25 +108,30 @@ public class ConversationService {
         history);
     List<RetrievedChunk> refs = trace.finalEvidence();
     if (refs.isEmpty()) {
-      delta.accept(NO_EVIDENCE);
-      Long id = conversations.saveMessage(conversationId, "ASSISTANT", NO_EVIDENCE, "COMPLETED",
-          null, null, elapsed(start));
       return CompletableFuture.completedFuture(
-          new ChatResult(id, NO_EVIDENCE, List.of(), elapsed(start)));
+          completeAnswer(conversationId, GeneratedAnswer.refused(NO_EVIDENCE), List.of(), start,
+              delta));
     }
-    StringBuilder answer = new StringBuilder();
     AnswerContext context = contextPolicy.assemble(question, prepared.summary(), history, refs);
     return CompletableFuture.supplyAsync(() -> {
-      AiUsage usage = ai.streamAnswer(context, p -> {
-        answer.append(p);
-        delta.accept(p);
-      });
-      long elapsed = elapsed(start);
-      Long id = conversations.saveMessage(conversationId, "ASSISTANT", answer.toString(),
-          "COMPLETED", usage.promptTokens(), usage.completionTokens(), elapsed);
-      conversations.saveReferences(id, context.evidence());
-      return new ChatResult(id, answer.toString(), context.evidence(), elapsed);
+      GeneratedAnswer generated = ai.generateAnswer(context);
+      return completeAnswer(conversationId, generated, context.evidence(), start, delta);
     });
+  }
+
+  private ChatResult completeAnswer(Long conversationId, GeneratedAnswer generated,
+      List<RetrievedChunk> evidence, long start, Consumer<String> delta) {
+    String answer = generated.refused() ? NO_EVIDENCE : generated.content();
+    List<RetrievedChunk> references = generated.refused() ? List.of() : evidence;
+    delta.accept(answer);
+    long elapsed = elapsed(start);
+    AiUsage usage = generated.usage();
+    Long id = conversations.saveMessage(conversationId, "ASSISTANT", answer, "COMPLETED",
+        usage.promptTokens(), usage.completionTokens(), elapsed);
+    if (!references.isEmpty()) {
+      conversations.saveReferences(id, references);
+    }
+    return new ChatResult(id, answer, generated.refused(), references, elapsed);
   }
 
   private PreparedHistory prepareHistory(Long conversationId) {
@@ -213,8 +219,8 @@ public class ConversationService {
   /**
    * 回答完成结果。
    */
-  public record ChatResult(Long messageId, String answer, List<RetrievedChunk> references,
-                           long elapsedMs) {
+  public record ChatResult(Long messageId, String answer, boolean refused,
+                           List<RetrievedChunk> references, long elapsedMs) {
 
   }
 

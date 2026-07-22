@@ -37,11 +37,10 @@ public final class EvaluationModels {
   }
 
   public record Judgment(double faithfulness, double answerRelevancy,
-                         double evidenceSupportAccuracy, boolean acceptableRefusal,
-                         String rationale) {
+                         double evidenceSupportAccuracy, String rationale) {
   }
 
-  public record CaseExecution(Long caseId, String answer, String rewrittenQuery,
+  public record CaseExecution(Long caseId, String answer, boolean refused, String rewrittenQuery,
                               List<RetrievalQuery> expandedQueries,
                               List<RetrievedChunk> candidates,
                               List<RetrievedChunk> finalEvidence, Scores scores,

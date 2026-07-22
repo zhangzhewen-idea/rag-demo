@@ -15,6 +15,7 @@ const messages = ref<Message[]>([])
 const question = ref('')
 const generating = ref(false)
 const references = ref<Reference[]>([])
+const refused = ref(false)
 const drawer = ref(false)
 const controller = ref<AbortController>()
 const questionInput = ref<InputInstance>()
@@ -67,6 +68,7 @@ async function send() {
   if (!text || generating.value) return
   question.value = ''
   references.value = []
+  refused.value = false
   messages.value.push({
     id: Date.now(),
     role: 'USER',
@@ -97,7 +99,8 @@ async function send() {
       references: value => {
         references.value = value
       },
-      done: () => {
+      done: result => {
+        refused.value = result.refused
         answer.status = 'COMPLETED'
       },
       error: value => {
@@ -179,6 +182,9 @@ onBeforeUnmount(() => {
             <span v-if="generating && message === messages.at(-1) && message.content"
                   class="cursor"/></p>
           <div v-if="message.role === 'ASSISTANT' && message.content" class="message-actions">
+            <el-tag v-if="refused && message === messages.at(-1)" size="small" type="info"
+                    effect="plain">已拒答
+            </el-tag>
             <el-button text size="small" @click="copy(message.content)">复制</el-button>
             <el-button v-if="message.status === 'FAILED'" text size="small" type="primary"
                        @click="reuseQuestion(index)">重新提问

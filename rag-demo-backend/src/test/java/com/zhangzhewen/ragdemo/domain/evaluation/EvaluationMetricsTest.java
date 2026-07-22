@@ -22,7 +22,7 @@ class EvaluationMetricsTest {
         chunk("制度.md", "正式员工年假为十天"), chunk("报销.md", "交通费上限 200 元"));
     List<RetrievedChunk> evidence = List.of(candidates.get(2), candidates.getFirst());
 
-    RetrievalScores scores = EvaluationMetrics.calculate(expected, candidates, evidence);
+    RetrievalScores scores = EvaluationMetrics.calculate(expected, candidates, evidence, false);
 
     assertThat(scores.candidateHitRate()).isEqualTo(1D);
     assertThat(scores.candidateMrr()).isEqualTo(.5D);
@@ -32,10 +32,12 @@ class EvaluationMetricsTest {
   }
 
   @Test
-  void scoresNoAnswerCaseByEmptyFinalEvidence() {
-    RetrievalScores accepted = EvaluationMetrics.calculate(List.of(), List.of(), List.of());
-    RetrievalScores falsePositive = EvaluationMetrics.calculate(List.of(), List.of(),
-        List.of(chunk("噪声.md", "无关内容")));
+  void scoresNoAnswerCaseByRefusalFlag() {
+    RetrievedChunk retrieved = chunk("噪声.md", "无关内容");
+    RetrievalScores accepted = EvaluationMetrics.calculate(List.of(), List.of(retrieved),
+        List.of(retrieved), true);
+    RetrievalScores falsePositive = EvaluationMetrics.calculate(List.of(), List.of(), List.of(),
+        false);
 
     assertThat(accepted.noAnswerAccuracy()).isEqualTo(1D);
     assertThat(falsePositive.noAnswerAccuracy()).isZero();

@@ -4,7 +4,7 @@ import type {Reference} from '@/types'
 export interface StreamHandlers {
   delta: (text: string) => void;
   references: (refs: Reference[]) => void;
-  done: (data: { messageId: number; elapsedMs: number }) => void;
+  done: (data: { messageId: number; elapsedMs: number; refused: boolean }) => void;
   error: (message: string) => void
 }
 
@@ -51,7 +51,8 @@ export async function streamChat(conversationId: number, content: string, handle
       const value = data as Record<string, unknown>;
       if (event === 'delta') handlers.delta(String(value.content ?? '')); else if (event === 'references') handlers.references(data as Reference[]); else if (event === 'done') handlers.done(data as {
         messageId: number;
-        elapsedMs: number
+        elapsedMs: number;
+        refused: boolean
       }); else if (event === 'error') handlers.error(String(value.message ?? '回答失败'))
     })
   }

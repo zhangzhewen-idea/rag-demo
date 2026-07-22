@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -15,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
 import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.Conversation;
+import com.zhangzhewen.ragdemo.domain.conversation.GeneratedAnswer;
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.Message;
 import com.zhangzhewen.ragdemo.domain.conversation.ReciprocalRankFusion;
@@ -36,7 +36,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -58,6 +57,7 @@ class ConversationServiceTest {
     var result = fixture.service.chat(9L, 2L, "问题", stream::append).join();
 
     assertThat(stream.toString()).isEqualTo(ConversationService.NO_EVIDENCE);
+    assertThat(result.refused()).isTrue();
     assertThat(result.references()).isEmpty();
     verifyNoInteractions(fixture.ai);
     verifyNoInteractions(fixture.rerank);
@@ -86,21 +86,19 @@ class ConversationServiceTest {
     when(fixture.queryExpansion.plan(rewritten)).thenReturn(List.of(plan));
     when(fixture.search.search(1L, plan, 20, .6)).thenReturn(candidates);
     when(fixture.rerank.rerank(rewritten, fused, 6)).thenReturn(evidence);
-    doAnswer(invocation -> {
-      Consumer<String> delta = invocation.getArgument(1);
-      delta.accept("回答");
-      return new AiUsage(120, 8);
-    }).when(fixture.ai).streamAnswer(any(), any());
+    when(fixture.ai.generateAnswer(any()))
+        .thenReturn(new GeneratedAnswer(false, "回答", new AiUsage(120, 8)));
 
     StringBuilder stream = new StringBuilder();
     var result = fixture.service.chat(9L, 2L, question, stream::append).join();
 
     assertThat(stream.toString()).isEqualTo("回答");
+    assertThat(result.refused()).isFalse();
     assertThat(result.references()).isEqualTo(evidence);
     verify(fixture.search).search(1L, plan, 20, .6);
     verify(fixture.rerank).rerank(rewritten, fused, 6);
     ArgumentCaptor<AnswerContext> context = ArgumentCaptor.forClass(AnswerContext.class);
-    verify(fixture.ai).streamAnswer(context.capture(), any());
+    verify(fixture.ai).generateAnswer(context.capture());
     assertThat(context.getValue().userPrompt()).contains("问题：" + question)
         .contains("<CONVERSATION_SUMMARY>").contains("<RECENT_MESSAGES>")
         .contains("<EVIDENCE>");
@@ -163,11 +161,8 @@ class ConversationServiceTest {
     when(fixture.search.search(1L, modelArtsQuery, 20, .6)).thenReturn(List.of(modelArts));
     when(fixture.search.search(1L, paiQuery, 20, .6)).thenReturn(List.of(pai));
     when(fixture.rerank.rerank(rewritten, fused, 6)).thenReturn(evidence);
-    doAnswer(invocation -> {
-      Consumer<String> delta = invocation.getArgument(1);
-      delta.accept("对比回答");
-      return new AiUsage(100, 10);
-    }).when(fixture.ai).streamAnswer(any(), any());
+    when(fixture.ai.generateAnswer(any()))
+        .thenReturn(new GeneratedAnswer(false, "对比回答", new AiUsage(100, 10)));
 
     var result = fixture.service.chat(9L, 2L, question, ignored -> {
     }).join();

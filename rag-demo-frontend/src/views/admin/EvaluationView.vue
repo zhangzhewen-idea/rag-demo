@@ -17,6 +17,11 @@ import type {
 
 const POLL_INTERVAL = 2_000
 const ACTIVE_RUN_STATUSES = new Set(['QUEUED', 'RUNNING'])
+const JUDGE_METRIC_KEYS = new Set<keyof EvaluationScores>([
+  'faithfulness',
+  'answerRelevancy',
+  'evidenceSupportAccuracy',
+])
 const ANSWER_TYPES: Array<{ label: string; value: EvaluationAnswerType }> = [
   {label: '事实问答', value: 'FACTUAL'},
   {label: '步骤说明', value: 'PROCEDURE'},
@@ -62,7 +67,7 @@ const METRIC_DEFINITIONS: Array<{
   },
   {
     key: 'noAnswerAccuracy', label: '拒答准确率',
-    description: '仅统计无黄金证据的拒答样本；最终没有召回证据记为正确，仍返回证据记为错误。没有拒答样本时显示不适用。'
+    description: '仅统计无黄金证据的拒答样本；格式化回答的 refused 标识为 true 记为正确，否则记为错误。没有拒答样本时显示不适用。'
   },
 ]
 
@@ -111,12 +116,17 @@ const baselineScores = computed(() => {
   return baselineId ? runs.value.find(run => run.id === baselineId)?.scores : undefined
 })
 const metrics = computed(() => {
-  const scores = selectedRun.value?.scores
+  const run = selectedRun.value
+  const scores = run?.scores
   if (!scores) return []
   return METRIC_DEFINITIONS.map(definition => {
-    const value = scores[definition.key]
+    const evaluating = ACTIVE_RUN_STATUSES.has(run.status) && JUDGE_METRIC_KEYS.has(definition.key)
+    const value = evaluating ? undefined : scores[definition.key]
     const threshold = thresholds.value?.[definition.key]
     const baseline = baselineScores.value?.[definition.key]
+    if (evaluating) {
+      return {...definition, value, threshold, baseline, state: 'pending' as const, reason: ''}
+    }
     if (value == null || threshold == null) {
       return {...definition, value, threshold, baseline, state: 'not-applicable' as const, reason: ''}
     }
@@ -487,7 +497,8 @@ function statusType(status: string) {
           </div>
           <b>{{ percent(metric.value) }}</b>
           <div class="metric-verdict">
-            <span v-if="metric.state === 'not-applicable'">不适用</span>
+            <span v-if="metric.state === 'pending'">评估中</span>
+            <span v-else-if="metric.state === 'not-applicable'">不适用</span>
             <span v-else-if="metric.state === 'passed'">已通过 · 门槛 {{ percent(metric.threshold) }}</span>
             <span v-else>未通过 · {{ metric.reason }}</span>
           </div>
@@ -514,7 +525,7 @@ function statusType(status: string) {
           <div class="case-body">
             <div class="answer-grid">
               <article><h4>黄金答案</h4><p>{{ result.evaluationCase.goldenAnswer }}</p></article>
-              <article><h4>模型回答</h4><p>{{ result.execution.answer || result.execution.errorMessage || '-' }}</p></article>
+              <article><h4>模型回答 <el-tag v-if="result.execution.refused" size="small" type="info" effect="plain">已拒答</el-tag></h4><p>{{ result.execution.answer || result.execution.errorMessage || '-' }}</p></article>
             </div>
             <div v-if="result.execution.scores" class="case-score-row">
               <span>Hit {{ percent(result.execution.scores.candidateHitRate) }}</span>

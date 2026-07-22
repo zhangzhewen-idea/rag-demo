@@ -168,6 +168,7 @@ export interface RetrievedChunk {
 export interface EvaluationExecution {
   caseId: number;
   answer?: string;
+  refused: boolean;
   rewrittenQuery?: string;
   expandedQueries: RetrievalQuery[];
   candidates: RetrievedChunk[];

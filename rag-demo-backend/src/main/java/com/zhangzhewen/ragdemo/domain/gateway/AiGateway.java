@@ -1,16 +1,15 @@
 package com.zhangzhewen.ragdemo.domain.gateway;
 
-import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
 import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
-import java.util.function.Consumer;
+import com.zhangzhewen.ragdemo.domain.conversation.GeneratedAnswer;
 
 /**
- * 大模型流式回答边界。
+ * 大模型格式化回答边界。
  */
 public interface AiGateway {
 
   /**
-   * 仅依据证据生成答案并逐段回调。
+   * 仅依据证据生成带拒答标识的格式化答案。
    */
-  AiUsage streamAnswer(AnswerContext context, Consumer<String> deltaConsumer);
+  GeneratedAnswer generateAnswer(AnswerContext context);
 }

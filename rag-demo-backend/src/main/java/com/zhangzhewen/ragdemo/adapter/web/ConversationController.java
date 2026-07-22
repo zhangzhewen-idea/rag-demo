@@ -108,7 +108,8 @@ public class ConversationController {
             }
             send(emitter, "references", result.references());
             send(emitter, "done",
-                Map.of("messageId", result.messageId(), "elapsedMs", result.elapsedMs()));
+                Map.of("messageId", result.messageId(), "elapsedMs", result.elapsedMs(),
+                    "refused", result.refused()));
             emitter.complete();
           });
     } catch (Exception e) {

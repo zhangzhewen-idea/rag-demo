@@ -175,6 +175,43 @@ describe('RAG 评估页面', () => {
     wrapper.unmount()
   })
 
+  it('评估过程中 Judge 指标显示为待产出状态', async () => {
+    const runningRun = {
+      ...(await evaluationApi.run(12)),
+      status: 'RUNNING',
+      scores: {
+        candidateHitRate: 0,
+        candidateMrr: 0,
+        contextRecall: 0,
+        contextPrecision: 0,
+        faithfulness: 0,
+        answerRelevancy: 0,
+        evidenceSupportAccuracy: 0,
+      },
+      passed: false,
+      completedCases: 0,
+      completedAt: undefined,
+      results: [],
+    }
+    evaluationApi.runs.mockResolvedValue([runningRun])
+    evaluationApi.run.mockResolvedValue(runningRun)
+
+    const wrapper = mount(EvaluationView, {
+      attachTo: document.body,
+      global: {plugins: [ElementPlus]},
+    })
+    await flushPromises()
+
+    for (const key of ['faithfulness', 'answerRelevancy', 'evidenceSupportAccuracy']) {
+      const card = wrapper.get(`[data-metric="${key}"]`)
+      expect(card.classes()).toContain('metric-pending')
+      expect(card.get('b').text()).toBe('-')
+      expect(card.text()).toContain('评估中')
+      expect(card.text()).not.toContain('未通过')
+    }
+    wrapper.unmount()
+  })
+
   it('逐题结果展示全部评估指标、Token 和延迟', async () => {
     const wrapper = mount(EvaluationView, {
       attachTo: document.body,

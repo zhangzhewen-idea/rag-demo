@@ -42,7 +42,6 @@ public class SpringAiEvaluationJudgeGateway implements EvaluationJudgeGateway {
         - faithfulness：被测答案中的事实是否都能由关联证据支撑。
         - answerRelevancy：被测答案是否直接、完整回应问题并符合答案类型。
         - evidenceSupportAccuracy：系统关联的证据是否确实支撑被测答案中的结论。
-        acceptableRefusal 仅表示：答案类型为 REFUSAL 时是否正确拒答；其他类型固定为 false。
         rationale 用简洁中文指出主要依据或问题。不要使用外部知识，不要因为答案更长而加分。
 
         问题：{question}

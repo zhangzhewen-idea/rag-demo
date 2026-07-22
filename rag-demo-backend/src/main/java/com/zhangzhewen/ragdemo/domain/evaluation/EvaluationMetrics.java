@@ -16,9 +16,9 @@ public final class EvaluationMetrics {
   }
 
   public static RetrievalScores calculate(List<ExpectedContext> expected,
-      List<RetrievedChunk> candidates, List<RetrievedChunk> finalEvidence) {
+      List<RetrievedChunk> candidates, List<RetrievedChunk> finalEvidence, boolean refused) {
     if (expected.isEmpty()) {
-      return new RetrievalScores(null, null, null, null, finalEvidence.isEmpty() ? 1D : 0D);
+      return new RetrievalScores(null, null, null, null, refused ? 1D : 0D);
     }
     int first = firstRelevantRank(expected, candidates);
     double hit = first < 0 ? 0D : 1D;

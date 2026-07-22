@@ -18,48 +18,63 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
-import reactor.core.publisher.Flux;
 
 /**
- * 流式回答内容与 token usage 适配测试。
+ * 格式化回答与 token usage 适配测试。
  */
 class SpringAiGatewayTest {
 
   @Test
-  void returnsProviderUsageAfterStreaming() {
+  void returnsStructuredAnswerAndProviderUsage() {
     ChatModel model = mock(ChatModel.class);
     ChatResponse response = new ChatResponse(
-        List.of(new Generation(new AssistantMessage("回答"))),
+        List.of(new Generation(new AssistantMessage(
+            "{\"refused\":false,\"content\":\"回答\"}"))),
         ChatResponseMetadata.builder().usage(new DefaultUsage(123, 7)).build());
     when(model.getOptions()).thenReturn(ChatOptions.builder().build());
-    when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response));
+    when(model.call(any(Prompt.class))).thenReturn(response);
     SpringAiGateway gateway = new SpringAiGateway(model, new SimpleLoggerAdvisor(),
         new ConservativeTokenEstimator());
     AnswerContext context = context(99);
-    StringBuilder answer = new StringBuilder();
+    var generated = gateway.generateAnswer(context);
 
-    var usage = gateway.streamAnswer(context, answer::append);
-
-    assertThat(answer).hasToString("回答");
-    assertThat(usage.promptTokens()).isEqualTo(123);
-    assertThat(usage.completionTokens()).isEqualTo(7);
+    assertThat(generated.content()).isEqualTo("回答");
+    assertThat(generated.refused()).isFalse();
+    assertThat(generated.usage().promptTokens()).isEqualTo(123);
+    assertThat(generated.usage().completionTokens()).isEqualTo(7);
   }
 
   @Test
   void estimatesUsageWhenProviderOmitsIt() {
     ChatModel model = mock(ChatModel.class);
     ChatResponse response = new ChatResponse(
-        List.of(new Generation(new AssistantMessage("估算回答"))));
+        List.of(new Generation(new AssistantMessage(
+            "{\"refused\":false,\"content\":\"估算回答\"}"))));
     when(model.getOptions()).thenReturn(ChatOptions.builder().build());
-    when(model.stream(any(Prompt.class))).thenReturn(Flux.just(response));
+    when(model.call(any(Prompt.class))).thenReturn(response);
     SpringAiGateway gateway = new SpringAiGateway(model, new SimpleLoggerAdvisor(),
         new ConservativeTokenEstimator());
 
-    var usage = gateway.streamAnswer(context(88), ignored -> {
-    });
+    var generated = gateway.generateAnswer(context(88));
 
-    assertThat(usage.promptTokens()).isEqualTo(88);
-    assertThat(usage.completionTokens()).isEqualTo(4);
+    assertThat(generated.usage().promptTokens()).isEqualTo(88);
+    assertThat(generated.usage().completionTokens()).isEqualTo(4);
+  }
+
+  @Test
+  void returnsRefusalMarkerFromStructuredAnswer() {
+    ChatModel model = mock(ChatModel.class);
+    ChatResponse response = new ChatResponse(
+        List.of(new Generation(new AssistantMessage(
+            "{\"refused\":true,\"content\":\"没有可靠依据\"}"))));
+    when(model.getOptions()).thenReturn(ChatOptions.builder().build());
+    when(model.call(any(Prompt.class))).thenReturn(response);
+    SpringAiGateway gateway = new SpringAiGateway(model, new SimpleLoggerAdvisor(),
+        new ConservativeTokenEstimator());
+
+    var generated = gateway.generateAnswer(context(88));
+
+    assertThat(generated.refused()).isTrue();
   }
 
   private AnswerContext context(int promptTokens) {

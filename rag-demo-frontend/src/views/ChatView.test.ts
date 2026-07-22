@@ -92,4 +92,23 @@ describe('会话页面', () => {
     wrapper.unmount()
     vi.useRealTimers()
   })
+
+  it('根据完成事件中的 refused 标识展示拒答状态', async () => {
+    mocks.streamChat.mockImplementation(async (_id, _content, handlers) => {
+      handlers.delta('当前知识库中未找到可靠依据')
+      handlers.references([])
+      handlers.done({messageId: 2, elapsedMs: 8, refused: true})
+    })
+    const wrapper = mount(ChatView, {attachTo: document.body, global: {plugins: [ElementPlus]}})
+    await flushPromises()
+
+    await wrapper.get('textarea').setValue('知识库之外的问题')
+    const send = wrapper.findAll('button').find(button => button.text().trim() === '发送')
+    await send!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('已拒答')
+    expect(wrapper.text()).not.toContain('条来源')
+    wrapper.unmount()
+  })
 })

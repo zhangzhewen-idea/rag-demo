@@ -19,7 +19,9 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 
 /**
  * 基于 Spring JDBC 保存评估集、运行轨迹和人工复核；评估集产生运行后保持不可变。
@@ -34,10 +36,13 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
       + "error_message,triggered_by,started_at,completed_at";
   private final JdbcTemplate jdbc;
   private final ObjectMapper mapper;
+  private final ObjectReader caseExecutionReader;
 
   public JdbcEvaluationGateway(JdbcTemplate jdbc, ObjectMapper mapper) {
     this.jdbc = jdbc;
     this.mapper = mapper;
+    this.caseExecutionReader = mapper.readerFor(CaseExecution.class)
+        .without(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);
   }
 
   @Override
@@ -245,13 +250,19 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
         (rs, n) -> {
           long caseId = rs.getLong("case_id");
           EvaluationCase evaluationCase = loadCase(caseId);
-          CaseExecution execution = mapper.readValue(rs.getString("execution_json"),
-              CaseExecution.class);
+          CaseExecution execution = readExecution(rs.getString("execution_json"));
           return new CaseResult(rs.getLong("id"), runId, evaluationCase, execution,
               rs.getBoolean("passed"), rs.getString("review_verdict"),
               rs.getString("review_comment"), nullableLong(rs.getObject("reviewed_by")),
               localDateTime(rs.getTimestamp("reviewed_at")));
         }, runId);
+  }
+
+  /**
+   * 兼容 refused 字段引入前保存的评估结果；历史记录缺少该字段时按非拒答处理。
+   */
+  CaseExecution readExecution(String executionJson) {
+    return caseExecutionReader.readValue(executionJson);
   }
 
   private EvaluationCase loadCase(Long caseId) {

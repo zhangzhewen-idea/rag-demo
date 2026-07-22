@@ -5,6 +5,7 @@ import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
 import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
 import com.zhangzhewen.ragdemo.domain.conversation.ConversationPrompt;
+import com.zhangzhewen.ragdemo.domain.conversation.GeneratedAnswer;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalTrace;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationMetrics;
 import com.zhangzhewen.ragdemo.domain.evaluation.EvaluationMetrics.RetrievalScores;
@@ -90,7 +91,7 @@ public class EvaluationWorker {
         casePassed = false;
         String reason = exception.getClass().getSimpleName() + ": "
             + safeMessage(exception.getMessage());
-        execution = new CaseExecution(evaluationCase.id(), "", "", List.of(), List.of(),
+        execution = new CaseExecution(evaluationCase.id(), "", false, "", List.of(), List.of(),
             List.of(), zeroScores(), reason, 0, 0, 0, reason);
         log.warn("RAG 评估样本执行失败: runId={}, caseId={}, reason={}", runId,
             evaluationCase.id(), exception.getClass().getSimpleName());
@@ -116,31 +117,31 @@ public class EvaluationWorker {
     long start = System.nanoTime();
     RetrievalTrace trace = retrieval.retrieve(knowledgeBaseId, evaluationCase.question(), "",
         List.of());
-    String answer;
-    AiUsage usage;
+    GeneratedAnswer generated;
     if (trace.finalEvidence().isEmpty()) {
-      answer = ConversationPrompt.NO_EVIDENCE;
-      usage = new AiUsage(0, 0);
+      generated = GeneratedAnswer.refused(ConversationPrompt.NO_EVIDENCE);
     } else {
       AnswerContext context = contextPolicy.assemble(evaluationCase.question(), "", List.of(),
           trace.finalEvidence());
-      StringBuilder generated = new StringBuilder();
-      usage = ai.streamAnswer(context, generated::append);
-      answer = generated.toString();
+      generated = ai.generateAnswer(context);
     }
+    String answer = generated.refused() ? ConversationPrompt.NO_EVIDENCE : generated.content();
+    AiUsage usage = generated.usage();
     Judgment judgment = judge.judge(evaluationCase.question(), evaluationCase.goldenAnswer(),
         evaluationCase.answerType(), answer, trace.finalEvidence());
     RetrievalScores retrievalScores = EvaluationMetrics.calculate(
-        evaluationCase.expectedContexts(), trace.candidates(), trace.finalEvidence());
+        evaluationCase.expectedContexts(), trace.candidates(), trace.finalEvidence(),
+        generated.refused());
     double relevancy = "REFUSAL".equals(evaluationCase.answerType())
-        && !judgment.acceptableRefusal() ? 0D : judgment.answerRelevancy();
+        && !generated.refused() ? 0D : judgment.answerRelevancy();
     Scores scores = new Scores(retrievalScores.candidateHitRate(), retrievalScores.candidateMrr(),
         retrievalScores.contextRecall(), retrievalScores.contextPrecision(),
         judgment.faithfulness(), relevancy, judgment.evidenceSupportAccuracy(),
         retrievalScores.noAnswerAccuracy());
-    return new CaseExecution(evaluationCase.id(), answer, trace.rewrittenQuery(),
-        trace.expandedQueries(), trace.candidates(), trace.finalEvidence(), scores,
-        judgment.rationale(), usage.promptTokens(), usage.completionTokens(), elapsed(start), null);
+    return new CaseExecution(evaluationCase.id(), answer, generated.refused(),
+        trace.rewrittenQuery(), trace.expandedQueries(), trace.candidates(), trace.finalEvidence(),
+        scores, judgment.rationale(), usage.promptTokens(), usage.completionTokens(), elapsed(start),
+        null);
   }
 
   private Scores aggregate(List<CaseExecution> executions) {

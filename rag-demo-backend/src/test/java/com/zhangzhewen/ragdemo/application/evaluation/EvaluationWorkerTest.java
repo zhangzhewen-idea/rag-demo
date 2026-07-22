@@ -3,7 +3,6 @@ package com.zhangzhewen.ragdemo.application.evaluation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +11,7 @@ import com.zhangzhewen.ragdemo.application.conversation.EvidenceRetrievalService
 import com.zhangzhewen.ragdemo.domain.conversation.AiUsage;
 import com.zhangzhewen.ragdemo.domain.conversation.AnswerContext;
 import com.zhangzhewen.ragdemo.domain.conversation.ContextAssemblyPolicy;
+import com.zhangzhewen.ragdemo.domain.conversation.GeneratedAnswer;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalQuery;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievalTrace;
 import com.zhangzhewen.ragdemo.domain.conversation.RetrievedChunk;
@@ -28,7 +28,6 @@ import com.zhangzhewen.ragdemo.domain.gateway.EvaluationJudgeGateway;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -61,13 +60,10 @@ class EvaluationWorkerTest {
     when(evaluations.findDataset(3L)).thenReturn(Optional.of(dataset));
     when(retrieval.retrieve(1L, "年假几天", "", List.of())).thenReturn(trace);
     when(contextPolicy.assemble("年假几天", "", List.of(), List.of(chunk))).thenReturn(context);
-    doAnswer(invocation -> {
-      Consumer<String> consumer = invocation.getArgument(1);
-      consumer.accept("年假为十天");
-      return new AiUsage(10, 5);
-    }).when(ai).streamAnswer(eq(context), any());
+    when(ai.generateAnswer(context))
+        .thenReturn(new GeneratedAnswer(false, "年假为十天", new AiUsage(10, 5)));
     when(judge.judge("年假几天", "十天", "FACTUAL", "年假为十天", List.of(chunk)))
-        .thenReturn(new Judgment(.9, .9, .9, false, "证据充分"));
+        .thenReturn(new Judgment(.9, .9, .9, "证据充分"));
 
     worker.process(5L);
 
