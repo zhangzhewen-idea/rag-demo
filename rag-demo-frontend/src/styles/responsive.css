@@ -1,0 +1,146 @@
+@media (max-width: 720px) {
+  body {
+    min-width: 0;
+  }
+
+  .shell {
+    display: block;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    padding: 14px 12px 10px;
+  }
+
+  .brand {
+    padding: 0 6px 10px;
+  }
+
+  .nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .nav .el-menu-item {
+    min-width: 0;
+    justify-content: center;
+    padding: 0 8px !important;
+  }
+
+  .nav-label {
+    grid-column: 1 / -1;
+    padding: 12px 8px 2px;
+  }
+
+  .sidebar-user {
+    margin-top: 10px;
+    padding: 10px 6px;
+  }
+
+  .main {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .page {
+    padding: 24px 16px 40px;
+  }
+
+  .page-head,
+  .welcome {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .welcome {
+    padding: 24px 20px;
+  }
+
+  .page h1,
+  .welcome h1 {
+    font-size: 28px;
+  }
+
+  .card-grid,
+  .card-grid.large,
+  .metric-grid,
+  .chart-grid,
+  .evaluation-layout,
+  .evaluation-metrics,
+  .answer-grid,
+  .form-grid,
+  .sample-options,
+  .evidence-form {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .evaluation-layout > * {
+    min-width: 0;
+  }
+
+  .wide-chart {
+    grid-column: auto;
+  }
+
+  .chart {
+    height: 240px;
+  }
+
+  .inline-stats,
+  .head-actions,
+  .hero-tags {
+    flex-wrap: wrap;
+  }
+
+  .panel-head,
+  .detail-head,
+  .run-summary,
+  .samples-head,
+  .evidence-title,
+  .review-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .run-detail {
+    padding: 18px;
+  }
+
+  .login-page {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 24px 16px;
+  }
+
+  .login-hero h1 {
+    font-size: 42px;
+  }
+
+  .login-card {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .chat-head {
+    padding: 0 16px;
+  }
+
+  .messages {
+    padding: 20px 16px;
+  }
+
+  .composer {
+    padding: 12px 16px 18px;
+  }
+
+  .bubble {
+    max-width: 88%;
+  }
+
+  .el-dialog {
+    max-width: calc(100vw - 32px);
+  }
+}
