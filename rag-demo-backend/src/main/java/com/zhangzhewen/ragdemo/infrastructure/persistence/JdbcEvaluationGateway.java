@@ -100,7 +100,7 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
   @Transactional
   public boolean updateDatasetIfUnused(Long id, Long knowledgeBaseId, String name, String version,
       List<EvaluationCase> cases) {
-    if (!lockUnusedDataset(id)) {
+    if (!lockUnusedDataset(id)) {  // todo 调试时可以开启
       return false;
     }
     jdbc.update(
@@ -114,7 +114,7 @@ public class JdbcEvaluationGateway implements EvaluationGateway {
   @Override
   @Transactional
   public boolean deleteDatasetIfUnused(Long id) {
-    if (!lockUnusedDataset(id)) {
+    if (!lockUnusedDataset(id)) {  // todo 调试时可以开启
       return false;
     }
     deleteCases(id);
